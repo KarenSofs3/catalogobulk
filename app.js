@@ -6,7 +6,7 @@ import { connectDB } from './src/config/db.js';
 import { connectRedis } from './src/config/redis.js'; // 1. Importamos Redis
 
 const app = express();
-const PORT = env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
