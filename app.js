@@ -9,7 +9,7 @@ import { connectRedis } from './src/config/redis.js';
 import authRoutes from './src/modules/auth/auth.routes.js';
 
 const app = express();
-const PORT = procces.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
