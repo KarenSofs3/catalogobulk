@@ -1,7 +1,7 @@
 import 'dotenv/config'; 
 import './src/config/env.js'; 
 import express from 'express';
-// import { connectDB } from './src/config/db.js'; 
+import { connectDB } from './src/config/db.js'; 
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,7 +16,7 @@ app.get('/api/health', (req, res) => {
 
 
 const start = async () => {
-    // await connectDB();
+    await connectDB();
     app.listen(PORT, () => {
         console.log(`Servidor corriendo con en http://localhost:${PORT}`);
     });
