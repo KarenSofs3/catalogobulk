@@ -12,7 +12,6 @@ const REQUIRED_ENV_VARS = [
 ];
 
 for (const varName of REQUIRED_ENV_VARS) {
-    console.log(`Verificando: ${varName} -> Valor actual: ${process.env[varName]}`);
     if (!process.env[varName]) {
         console.error(`ERROR: Falta la variable de entorno [${varName}] en el archivo .env`);
         process.exit(1); // Detiene la aplicación de inmediato (Falla temprano)
