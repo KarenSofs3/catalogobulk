@@ -1,11 +1,25 @@
-import express from   'express'
+import 'dotenv/config'; 
+import './src/config/env.js'; 
+import express from 'express';
+// import { connectDB } from './src/config/db.js'; 
 
-const app = express()
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-app.use(express.json())
+
+app.use(express.json()); 
+
 
 app.get('/api/health', (req, res) => {
-    res.status(200).json({ status: "ok", message: "¡Servidor levantado con ES Modules!" });
+    res.status(200).json({ status: "ok", message: "Servidor corriendo" });
 });
 
-export default app;
+
+const start = async () => {
+    // await connectDB();
+    app.listen(PORT, () => {
+        console.log(`Servidor corriendo con en http://localhost:${PORT}`);
+    });
+};
+
+start();
