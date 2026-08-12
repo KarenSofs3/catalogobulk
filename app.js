@@ -4,7 +4,7 @@ import express from 'express';
 import { connectDB } from './src/config/db.js'; 
 
 const app = express();
-const PORT = env.PORT || 3000;
+const PORT = procces.env.PORT || 3000;
 
 app.use(express.json()); 
 
