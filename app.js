@@ -6,7 +6,7 @@ import { connectDB, isMongoUp } from './src/config/db.js';
 import { connectRedis, isRedisUp } from './src/config/redis.js';
 import proveedorRoutes from './src/modules/proveedores/proveedor.routes.js';
 import categoriaRoutes from './src/modules/categorias/categoria.routes.js';
-
+import productoRoutes from './src/modules/productos/producto.routes.js';
 
 // 1. Importa las rutas de autenticación
 import authRoutes from './src/modules/auth/auth.routes.js';
@@ -20,6 +20,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/proveedores', proveedorRoutes);
 app.use('/api/categorias', categoriaRoutes);
+app.use('/api/productos', productoRoutes)
 // GET /health — refleja el estado real de Mongo y Redis (no un "ok" fijo)
 app.get('/health', (req, res) => {
     const mongoUp = isMongoUp();
