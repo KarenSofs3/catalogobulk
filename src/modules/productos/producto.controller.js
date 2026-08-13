@@ -1,51 +1,79 @@
 // src/modules/productos/producto.controller.js
-import { productoService } from './producto.service.js';
+import { Producto } from './producto.model.js';
+import { Proveedor } from '../proveedores/proveedor.model.js';
+import { AppError } from '../../errors/AppError.js';
 
-class ProductoController {
-    async crear(req, res, next) {
-        try {
-            const nuevo = await productoService.crearProducto(req.body);
-            return res.status(201).json(nuevo);
-        } catch (error) {
-            next(error);
+export const obtenerProductos = async (req, res, next) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = Math.min(parseInt(req.query.limit) || 20, 100); // Máx 100
+        const skip = (page - 1) * limit;
+
+        const query = {};
+
+        // Filtro por categoría (slug)
+        if (req.query.categoria) query.categoria = req.query.categoria;
+
+        // Filtro por disponible (true/false)
+        if (req.query.disponible !== undefined) {
+            const isDisponible = req.query.disponible === 'true';
+            query.stock = isDisponible ? { $gt: 0 } : { $eq: 0 };
         }
-    }
 
-    async listar(req, res, next) {
-        try {
-            const productos = await productoService.obtenerTodos();
-            return res.status(200).json(productos);
-        } catch (error) {
-            next(error);
+        // Filtro por proveedor (id o slug)
+        if (req.query.proveedor) {
+            if (req.query.proveedor.match(/^[0-9a-fA-F]{24}$/)) {
+                query.proveedorId = req.query.proveedor;
+            } else {
+                const prov = await Proveedor.findOne({ slug: req.query.proveedor });
+                if (prov) query.proveedorId = prov._id;
+            }
         }
-    }
 
-    async obtenerUno(req, res, next) {
-        try {
-            const producto = await productoService.obtenerPorId(req.params.id);
-            return res.status(200).json(producto);
-        } catch (error) {
-            next(error);
+        const total = await Producto.countDocuments(query);
+        const data = await Producto.find(query).skip(skip).limit(limit);
+
+        // Estructura exacta de respuesta (Sección 7.2)
+        return res.status(200).json({
+            data,
+            page,
+            limit,
+            total
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const crearProducto = async (req, res, next) => {
+    try {
+        const { sku, nombre, precio, stock, categoria, proveedorId, descripcion, imagenUrl } = req.body;
+
+        // Validar si el proveedor existe
+        const proveedorExiste = await Proveedor.findById(proveedorId);
+        if (!proveedorExiste) {
+            return next(new AppError('El proveedorId especificado no existe', 404, 'PROVEEDOR_NO_ENCONTRADO'));
         }
-    }
 
-    async actualizar(req, res, next) {
-        try {
-            const actualizado = await productoService.actualizarProducto(req.params.id, req.body);
-            return res.status(200).json(actualizado);
-        } catch (error) {
-            next(error);
+        // Validar SKU duplicado de forma controlada
+        const skuExiste = await Producto.findOne({ sku: sku.trim().toUpperCase() });
+        if (skuExiste) {
+            return next(new AppError('El SKU ya se encuentra registrado', 409, 'SKU_DUPLICADO'));
         }
-    }
 
-    async eliminar(req, res, next) {
-        try {
-            await productoService.eliminarProducto(req.params.id);
-            return res.status(204).send();
-        } catch (error) {
-            next(error);
-        }
-    }
-}
+        const nuevoProducto = await Producto.create({
+            sku: sku.trim().toUpperCase(),
+            nombre,
+            precio,
+            stock,
+            categoria,
+            proveedorId,
+            descripcion,
+            imagenUrl
+        });
 
-export const productoController = new ProductoController();
+        return res.status(201).json(nuevoProducto);
+    } catch (error) {
+        next(error);
+    }
+};

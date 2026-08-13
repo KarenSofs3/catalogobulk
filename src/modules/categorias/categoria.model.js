@@ -6,13 +6,22 @@ const categoriaSchema = new Schema({
         type: String,
         required: [true, 'El slug de la categoría es obligatorio'],
         unique: true,
-        index: true,
-        trim: true,
-        lowercase: true // Normalización automática: "Tecnología" -> "tecnologia"
+        lowercase: true,
+        trim: true
     },
     nombre: {
         type: String,
         required: [true, 'El nombre de la categoría es obligatorio'],
+        trim: true
+    },
+    descripcion: {
+        type: String,
+        default: null,
+        trim: true
+    },
+    imagenUrl: {
+        type: String,
+        default: null,
         trim: true
     }
 }, {

@@ -1,18 +1,24 @@
 // src/modules/proveedores/proveedor.routes.js
 import { Router } from 'express';
-import { proveedorController } from './proveedor.controller.js';
+import { crearProveedor, eliminarProveedor } from './proveedor.controller.js';
 import { protegerRuta } from '../../middlewares/auth.js';
 import { rol } from '../../middlewares/rol.js';
 
 const router = Router();
 
-// Rutas públicas o accesibles por cualquier usuario autenticado
-router.get('/', protegerRuta, proveedorController.listar);
-router.get('/:id', protegerRuta, proveedorController.obtenerUno);
+// GET /api/proveedores -> Autenticado (cualquier rol)
+router.get('/', protegerRuta, (req, res) => { /* listar proveedores */ });
 
-// Rutas protegidas únicamente para Administradores
-router.post('/', protegerRuta, rol('admin'), proveedorController.crear);
-router.put('/:id', protegerRuta, rol('admin'), proveedorController.actualizar);
-router.delete('/:id', protegerRuta, rol('admin'), proveedorController.eliminar);
+// GET /api/proveedores/:id -> Autenticado
+router.get('/:id', protegerRuta, (req, res) => { /* obtener uno */ });
+
+// POST /api/proveedores -> Solo Admin
+router.post('/', protegerRuta, rol('admin'), crearProveedor);
+
+// PUT /api/proveedores/:id -> Solo Admin
+router.put('/:id', protegerRuta, rol('admin'), (req, res) => { /* actualizar */ });
+
+// DELETE /api/proveedores/:id -> Solo Admin (Aplica restricción de integridad)
+router.delete('/:id', protegerRuta, rol('admin'), eliminarProveedor);
 
 export default router;
