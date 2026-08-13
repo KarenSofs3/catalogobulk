@@ -1,27 +1,50 @@
-// Fragmento de lógica en src/modules/proveedores/proveedor.service.js o repository
+// src/modules/proveedores/proveedor.repository.js
 import { Proveedor } from './proveedor.model.js';
 import { Producto } from '../productos/producto.model.js';
-import { AppError } from '../../errors/AppError.js';
 
-class ProveedorService {
-    async eliminarProveedor(id) {
-        // Buscar si el proveedor existe
-        const proveedor = await Proveedor.findById(id);
-        if (!proveedor) {
-            throw new AppError('Proveedor no encontrado', 404, 'PROVEEDOR_NO_ENCONTRADO');
-        }
+class ProveedorRepository {
+    async findAll(filtros = {}, skip = 0, limit = 20) {
+        return await Proveedor.find(filtros)
+            .skip(skip)
+            .limit(limit)
+            .lean();
+    }
 
-        // 🚨 CRITERIO DE ACEPTACIÓN: Validar integridad referencial con productos
-        const tieneProductos = await Producto.exists({ proveedorId: id });
-        if (tieneProductos) {
-            throw new AppError(
-                'No se puede eliminar el proveedor porque tiene productos asociados. Use activo: false en su lugar.', 
-                409, 
-                'INTEGRIDAD_REFERENCIAL_VIOLADA'
-            );
-        }
+    async countAll(filtros = {}) {
+        return await Proveedor.countDocuments(filtros);
+    }
 
-        await Proveedor.findByIdAndDelete(id);
-        return null; // Respuesta 204 sin cuerpo
+    async findById(id) {
+        return await Proveedor.findById(id).lean();
+    }
+
+    async findBySlug(slug) {
+        return await Proveedor.findOne({ slug }).lean();
+    }
+
+    async create(data) {
+        const proveedor = await Proveedor.create(data);
+        return await Proveedor.findById(proveedor._id).lean();
+    }
+
+    async update(id, data) {
+        return await Proveedor.findByIdAndUpdate(id, data, {
+            new: true,
+            runValidators: true
+        }).lean();
+    }
+
+    async delete(id) {
+        return await Proveedor.findByIdAndDelete(id);
+    }
+
+    /**
+     * Contar cuántos productos tiene este proveedor.
+     * Usado para validar que no tenga productos antes de eliminar.
+     */
+    async countProductos(proveedorId) {
+        return await Producto.countDocuments({ proveedorId });
     }
 }
+
+export const proveedorRepository = new ProveedorRepository();

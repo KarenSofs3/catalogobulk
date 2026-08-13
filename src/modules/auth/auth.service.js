@@ -2,6 +2,7 @@
 import jwt from 'jsonwebtoken';
 import { Usuario } from './usuario.model.js';
 import { env } from '../../config/env.js';
+import { AppError } from '../../errors/AppError.js';
 
 class AuthService {
     /**
@@ -11,9 +12,7 @@ class AuthService {
     async registrar({ email, password, rol }) {
         const usuarioExiste = await Usuario.findOne({ email });
         if (usuarioExiste) {
-            const error = new Error('El correo electrónico ya está registrado');
-            error.statusCode = 409;
-            throw error;
+            throw new AppError('El correo electrónico ya está registrado', 409, 'EMAIL_DUPLICADO');
         }
 
         // rol es opcional; si se omite, el default del modelo lo deja en "user"
@@ -33,16 +32,12 @@ class AuthService {
     async iniciarSesion(email, password) {
         const usuario = await Usuario.findOne({ email }).select('+password');
         if (!usuario) {
-            const error = new Error('Credenciales inválidas');
-            error.statusCode = 401;
-            throw error;
+            throw new AppError('Credenciales inválidas', 401, 'CREDENCIALES_INVALIDAS');
         }
 
         const esValida = await usuario.comparePassword(password);
         if (!esValida) {
-            const error = new Error('Credenciales inválidas');
-            error.statusCode = 401;
-            throw error;
+            throw new AppError('Credenciales inválidas', 401, 'CREDENCIALES_INVALIDAS');
         }
 
         const token = this.generarToken(usuario._id, usuario.rol);

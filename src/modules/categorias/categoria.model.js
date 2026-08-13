@@ -4,25 +4,24 @@ import { Schema, model } from 'mongoose';
 const categoriaSchema = new Schema({
     slug: {
         type: String,
-        required: [true, 'El slug de la categoría es obligatorio'],
+        required: [true, 'Slug es requerido'],
         unique: true,
         lowercase: true,
-        trim: true
+        trim: true,
+        match: [/^[a-z0-9\-]+$/, 'Slug solo puede contener letras minúsculas, números y guiones']
     },
     nombre: {
         type: String,
-        required: [true, 'El nombre de la categoría es obligatorio'],
-        trim: true
+        required: [true, 'Nombre es requerido']
     },
     descripcion: {
         type: String,
-        default: null,
-        trim: true
+        default: null
     },
     imagenUrl: {
         type: String,
         default: null,
-        trim: true
+        match: [/^https?:\/\/.+/, 'Imagen debe ser URL http(s)']
     }
 }, {
     timestamps: true

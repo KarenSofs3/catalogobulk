@@ -2,28 +2,44 @@
 import { Categoria } from './categoria.model.js';
 
 class CategoriaRepository {
-    async create(datos) {
-        return await Categoria.create(datos);
-    }
-
-    async findById(id) {
-        return await Categoria.findById(id);
+    async findAll() {
+        return await Categoria.find().lean();
     }
 
     async findBySlug(slug) {
-        return await Categoria.findOne({ slug: slug.toLowerCase().trim() });
+        return await Categoria.findOne({ slug }).lean();
     }
 
-    async findAll() {
-        return await Categoria.find().sort({ nombre: 1 });
+    async findById(id) {
+        return await Categoria.findById(id).lean();
     }
 
-    async update(id, datos) {
-        return await Categoria.findByIdAndUpdate(id, datos, { new: true, runValidators: true });
+    async create(data) {
+        const categoria = await Categoria.create(data);
+        return await Categoria.findById(categoria._id).lean();
+    }
+
+    async update(id, data) {
+        return await Categoria.findByIdAndUpdate(id, data, {
+            new: true,
+            runValidators: true
+        }).lean();
     }
 
     async delete(id) {
         return await Categoria.findByIdAndDelete(id);
+    }
+
+    /**
+     * Crear o actualizar una categoría (upsert).
+     * Usado en el import para auto-crear categorías que no existen.
+     */
+    async upsert(slug, data) {
+        return await Categoria.findOneAndUpdate(
+            { slug },
+            { $setOnInsert: { ...data, slug } },
+            { upsert: true, new: true, lean: true }
+        );
     }
 }
 

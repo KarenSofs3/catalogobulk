@@ -5,20 +5,20 @@ const importJobSchema = new Schema({
     usuarioId: {
         type: Schema.Types.ObjectId,
         ref: 'Usuario',
-        required: [true, 'El ID del usuario es obligatorio']
+        required: [true, 'Usuario es requerido']
     },
     proveedorId: {
         type: Schema.Types.ObjectId,
         ref: 'Proveedor',
-        required: [true, 'El ID del proveedor es obligatorio']
+        required: [true, 'Proveedor es requerido']
     },
     archivoNombre: {
         type: String,
-        required: [true, 'El nombre del archivo es obligatorio']
+        required: [true, 'Nombre de archivo es requerido']
     },
     archivoRuta: {
         type: String,
-        required: [true, 'La ruta del archivo es obligatoria']
+        required: [true, 'Ruta de archivo es requerida']
     },
     estado: {
         type: String,
@@ -27,7 +27,7 @@ const importJobSchema = new Schema({
     },
     total: {
         type: Number,
-        default: null // null hasta que el worker lo conozca al procesar
+        default: null  // null hasta que se conozca (se lee el archivo)
     },
     procesados: {
         type: Number,
@@ -41,13 +41,17 @@ const importJobSchema = new Schema({
         type: Number,
         default: 0
     },
-    errores: [
-        {
-            fila: { type: Number, required: true },
-            sku: { type: String, default: null },
-            motivo: { type: String, required: true }
-        }
-    ],
+    errores: {
+        type: [
+            {
+                fila: Number,
+                sku: { type: String, default: null },
+                motivo: String
+            }
+        ],
+        default: []
+        // cap a IMPORT_ERRORS_CAP se maneja en el service/worker, no en el schema
+    },
     bullJobId: {
         type: String,
         default: null
@@ -65,15 +69,7 @@ const importJobSchema = new Schema({
         default: null
     }
 }, {
-    timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true }
-});
-
-// Porcentaje virtual derivado según la sección 7.5 del PDF
-importJobSchema.virtual('porcentaje').get(function() {
-    if (!this.total) return 0;
-    return Math.round((this.procesados / this.total) * 100);
+    timestamps: true
 });
 
 export const ImportJob = model('ImportJob', importJobSchema);

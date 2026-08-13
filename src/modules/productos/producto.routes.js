@@ -1,24 +1,31 @@
 // src/modules/productos/producto.routes.js
 import { Router } from 'express';
-import { obtenerProductos, crearProducto } from './producto.controller.js';
-import { protegerRuta } from '../../middlewares/auth.js';
+import { productoController } from './producto.controller.js';
+import { autenticar } from '../../middlewares/auth.js';
 import { rol } from '../../middlewares/rol.js';
 
 const router = Router();
 
-// GET /api/productos -> Autenticado (cualquier rol)
-router.get('/', protegerRuta, obtenerProductos);
+// Todos los endpoints requieren autenticación
+router.use(autenticar);
 
-// GET /api/productos/:id -> Autenticado
-router.get('/:id', protegerRuta, (req, res) => { /* obtener uno */ });
+// GET /api/productos — listado paginado, autenticado
+router.get('/', productoController.obtenerProductos.bind(productoController));
 
-// POST /api/productos -> Solo Admin
-router.post('/', protegerRuta, rol('admin'), crearProducto);
+// GET /api/productos/stats — estadísticas, autenticado
+// OJO: Esto DEBE ir ANTES de /:id, o Express interpretará "stats" como un ID
+router.get('/stats', productoController.obtenerStats.bind(productoController));
 
-// PUT /api/productos/:id -> Solo Admin
-router.put('/:id', protegerRuta, rol('admin'), (req, res) => { /* actualizar */ });
+// GET /api/productos/:id — obtener uno, autenticado
+router.get('/:id', productoController.obtenerProducto.bind(productoController));
 
-// DELETE /api/productos/:id -> Solo Admin
-router.delete('/:id', protegerRuta, rol('admin'), (req, res) => { /* eliminar */ });
+// POST /api/productos — crear, solo admin
+router.post('/', rol('admin'), productoController.crearProducto.bind(productoController));
+
+// PUT /api/productos/:id — actualizar, solo admin
+router.put('/:id', rol('admin'), productoController.actualizarProducto.bind(productoController));
+
+// DELETE /api/productos/:id — eliminar, solo admin
+router.delete('/:id', rol('admin'), productoController.eliminarProducto.bind(productoController));
 
 export default router;

@@ -1,3 +1,6 @@
+// src/config/env.js
+import 'dotenv/config';  // CRITICAL: Cargar .env ANTES de leer process.env
+
 const REQUIRED_ENV_VARS = [
     'PORT',
     'MONGO_URI',

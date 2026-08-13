@@ -1,49 +1,53 @@
 // app.js
-import 'dotenv/config'; 
-import './src/config/env.js'; 
 import express from 'express';
-import { isMongoUp } from './src/config/db.js';
-import { isRedisUp } from './src/config/redis.js';
+import swaggerUi from 'swagger-ui-express';
+import { connectDB, isMongoUp } from './src/config/db.js';
+import { connectRedis, isRedisUp } from './src/config/redis.js';
+import { errorHandler } from './src/middlewares/errorHandler.js';
+import swaggerSpec from './src/config/swagger.js';
 
-// Importación de rutas
+// Importar rutas
 import authRoutes from './src/modules/auth/auth.routes.js';
+import productoRoutes from './src/modules/productos/producto.routes.js';
 import proveedorRoutes from './src/modules/proveedores/proveedor.routes.js';
 import categoriaRoutes from './src/modules/categorias/categoria.routes.js';
-import productoRoutes from './src/modules/productos/producto.routes.js';
-import importRoutes from './src/modules/imports/import.routes.js';
-
-// Importación del middleware de errores centralizado
-import { errorHandler } from './src/middlewares/errorHandler.js';
 
 const app = express();
 
+// Middleware global
 app.use(express.json());
 
-// 🟢 CONTRATO LITERAL FASE 0: GET /health
+// Conectar bases de datos
+export const setupDatabases = async () => {
+    await connectDB();
+    await connectRedis();
+};
+
+// ============ RUTAS ============
+
+// GET /health — reflexiona el estado real de Mongo y Redis
 app.get('/health', (req, res) => {
     const mongoUp = isMongoUp();
     const redisUp = isRedisUp();
-    
-    // Si ambos están arriba es 200, si alguno cae es 503
-    const statusCode = mongoUp && redisUp ? 200 : 503;
+    const status = mongoUp && redisUp ? 200 : 503;
 
-    // Estructura exacta solicitada por el PDF: { "status", "mongo", "redis" }
-    return res.status(statusCode).json({
-        status: statusCode === 200 ? 'ok' : 'error',
+    res.status(status).json({
+        status: status === 200 ? 'ok' : 'degraded',
         mongo: mongoUp ? 'up' : 'down',
         redis: redisUp ? 'up' : 'down'
     });
 });
 
-// 🛣️ Vinculación de rutas bajo el prefijo /api
+// Rutas bajo /api
 app.use('/api/auth', authRoutes);
+app.use('/api/productos', productoRoutes);
 app.use('/api/proveedores', proveedorRoutes);
 app.use('/api/categorias', categoriaRoutes);
-app.use('/api/productos', productoRoutes);
-app.use('/api/imports', importRoutes);
 
-// 🚨 Último middleware obligatorio: Manejador centralizado de errores
+// Documentación Swagger
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Middleware de manejo de errores (DEBE ir al final)
 app.use(errorHandler);
 
-// EXPORTACIÓN OBLIGATORIA: Sin listen, para que Jest/Supertest funcione limpio
 export default app;
