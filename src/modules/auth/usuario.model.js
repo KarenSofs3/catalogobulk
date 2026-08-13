@@ -3,34 +3,32 @@ import { Schema, model } from 'mongoose';
 import bcrypt from 'bcrypt';
 
 const usuarioSchema = new Schema({
-    name: {
-        type: String,
-        required: [true, 'El nombre es obligatorio'],
-        trim: true
-    },
     email: {
         type: String,
         required: [true, 'El correo es obligatorio'],
         unique: true,
         lowercase: true,
-        trim: true
+        trim: true,
+        match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Formato de correo inválido']
     },
     password: {
         type: String,
         required: [true, 'La contraseña es obligatoria'],
-        minlength: [6, 'La contraseña debe tener al menos 6 caracteres']
+        select: false // nunca se devuelve por defecto en las consultas
     },
-    role: {
+    rol: {
         type: String,
         enum: ['admin', 'user'],
         default: 'user'
-    },
-    isActive: {
-        type: Boolean,
-        default: true
     }
 }, {
-    timestamps: true
+    timestamps: true,
+    toJSON: {
+        transform: (_doc, ret) => {
+            delete ret.password; // blindaje extra: nunca sale ni por accidente
+            return ret;
+        }
+    }
 });
 
 // Middleware para encriptar contraseña antes de guardar

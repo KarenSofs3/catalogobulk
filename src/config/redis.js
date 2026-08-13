@@ -10,14 +10,24 @@ export const redisClient = createClient({
 // Manejador de errores global para Redis (Exigido para evitar caídas silenciosas)
 redisClient.on('error', (err) => console.error('❌ Error crítico en el cliente de Redis:', err));
 
-export const connectRedis = async () => {
+const MAX_INTENTOS = 10;
+const ESPERA_MS = 3000;
+
+export const connectRedis = async (intento = 1) => {
     try {
         await redisClient.connect();
         console.log('❤️ Redis Conectado con éxito');
     } catch (error) {
-        console.error(`❌ Error al conectar a Redis: ${error.message}`);
-        // A diferencia de Mongo, a veces se permite que el servidor siga sin caché,
-        // pero como estamos blindando la Fase 0, lo ideal es asegurar que todo levante.
-        process.exit(1); 
+        // depends_on solo ordena el arranque, no espera a que Redis esté listo.
+        if (intento < MAX_INTENTOS) {
+            console.warn(`⚠️  Redis no responde aún (intento ${intento}/${MAX_INTENTOS}), reintentando en ${ESPERA_MS / 1000}s...`);
+            await new Promise((resolve) => setTimeout(resolve, ESPERA_MS));
+            return connectRedis(intento + 1);
+        }
+        console.error(`❌ Error al conectar a Redis tras ${MAX_INTENTOS} intentos: ${error.message}`);
+        process.exit(1);
     }
 };
+
+// Usado por GET /health para reportar el estado real sin tumbar el proceso
+export const isRedisUp = () => redisClient.isOpen;

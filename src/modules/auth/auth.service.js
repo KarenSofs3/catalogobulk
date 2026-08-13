@@ -5,81 +5,60 @@ import { env } from '../../config/env.js';
 
 class AuthService {
     /**
-     * Registra un nuevo usuario en el sistema
+     * Registra un nuevo usuario en el sistema.
+     * Contrato (7.1): devuelve { id, email, rol }, sin token.
      */
-    async registrar(datosUsuario) {
-        const { name, email, password, role } = datosUsuario;
-
-        // 1. Verificar si el correo ya está registrado
+    async registrar({ email, password, rol }) {
         const usuarioExiste = await Usuario.findOne({ email });
         if (usuarioExiste) {
-            throw new Error('El correo electrónico ya está registrado');
+            const error = new Error('El correo electrónico ya está registrado');
+            error.statusCode = 409;
+            throw error;
         }
 
-        // 2. Crear el nuevo usuario (la contraseña se encripta sola gracias al middleware del modelo)
-        const nuevoUsuario = await Usuario.create({
-            name,
-            email,
-            password,
-            role
-        });
+        // rol es opcional; si se omite, el default del modelo lo deja en "user"
+        const nuevoUsuario = await Usuario.create({ email, password, rol });
 
-        // 3. Generar el Token JWT de bienvenida
-        const token = this.generarToken(nuevoUsuario._id, nuevoUsuario.role);
-
-        // Retornamos los datos limpios (sin la contraseña por seguridad)
         return {
-            usuario: {
-                id: nuevoUsuario._id,
-                name: nuevoUsuario.name,
-                email: nuevoUsuario.email,
-                role: nuevoUsuario.role
-            },
-            token
+            id: nuevoUsuario._id,
+            email: nuevoUsuario.email,
+            rol: nuevoUsuario.rol
         };
     }
 
     /**
-     * Autentica un usuario (Login)
+     * Autentica un usuario (Login).
+     * Contrato (7.1): devuelve { token }.
      */
     async iniciarSesion(email, password) {
-        // 1. Buscar al usuario por correo y verificar que esté activo
-        const usuario = await Usuario.findOne({ email, isActive: true });
+        const usuario = await Usuario.findOne({ email }).select('+password');
         if (!usuario) {
-            throw new Error('Credenciales incorrectas o el usuario no existe');
+            const error = new Error('Credenciales inválidas');
+            error.statusCode = 401;
+            throw error;
         }
 
-        // 2. Comparar la contraseña ingresada con la encriptada en la BD
         const esValida = await usuario.comparePassword(password);
         if (!esValida) {
-            throw new Error('Credenciales incorrectas o el usuario no existe');
+            const error = new Error('Credenciales inválidas');
+            error.statusCode = 401;
+            throw error;
         }
 
-        // 3. Generar el Token JWT
-        const token = this.generarToken(usuario._id, usuario.role);
-
-        return {
-            usuario: {
-                id: usuario._id,
-                name: usuario.name,
-                email: usuario.email,
-                role: usuario.role
-            },
-            token
-        };
+        const token = this.generarToken(usuario._id, usuario.rol);
+        return { token };
     }
 
     /**
-     * Función utilitaria privada para firmar los JWT
+     * Firma el JWT con el payload exacto del contrato: { sub, rol }
      */
-    generarToken(id, role) {
+    generarToken(usuarioId, rol) {
         return jwt.sign(
-            { id, role },
-            env.JWT_SECRET, // Usamos la variable ya validada en la Fase 0
+            { sub: usuarioId, rol },
+            env.JWT_SECRET,
             { expiresIn: env.JWT_EXPIRES_IN }
         );
     }
 }
 
-// Exportamos una instancia única del servicio (Singleton) para usarla en el controlador
 export const authService = new AuthService();

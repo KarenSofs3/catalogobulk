@@ -1,0 +1,23 @@
+services:
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file: .env
+    depends_on:   # solo garantiza ORDEN de arranque, no que estén listos
+      - mongo
+      - redis
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo_data:/data/db   # persiste datos entre reinicios
+
+  redis:
+    image: redis:7-alpine
+
+volumes:
+  mongo_data:
