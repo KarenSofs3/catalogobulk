@@ -1,10 +1,12 @@
 // src/__tests__/fase1.test.js
 import request from 'supertest';
-import app, { setupDatabases } from '../app.js';
+import app, { setupDatabases } from '../../app.js';
 import { Usuario } from '../modules/auth/usuario.model.js';
 import { Producto } from '../modules/productos/producto.model.js';
 import { Proveedor } from '../modules/proveedores/proveedor.model.js';
 import { Categoria } from '../modules/categorias/categoria.model.js';
+import { connectDB } from '../../src/config/db.js';  // ← AGREGAR
+import { connectRedis } from '../../src/config/redis.js';  // ← AGREGAR
 
 // Helper para obtener token de un usuario
 const loginAs = async (email, password) => {
@@ -18,7 +20,8 @@ describe('FASE 1: Auth + CRUD (Productos, Proveedores, Categorías)', () => {
     let adminToken, userToken, adminId, userId, proveedorId;
 
     beforeAll(async () => {
-        await setupDatabases();
+        await connectDB();
+        await connectRedis();
         // Limpiar datos de pruebas anteriores
         await Usuario.deleteMany({});
         await Producto.deleteMany({});
