@@ -6,8 +6,7 @@ import { rol } from '../../middlewares/rol.js';
 
 const router = Router();
 
-// Todos los endpoints requieren autenticación
-router.use(autenticar);
+
 
 // GET /api/productos — listado paginado, autenticado
 router.get('/', productoController.obtenerProductos.bind(productoController));
@@ -18,6 +17,9 @@ router.get('/stats', productoController.obtenerStats.bind(productoController));
 
 // GET /api/productos/:id — obtener uno, autenticado
 router.get('/:id', productoController.obtenerProducto.bind(productoController));
+
+// Todos los endpoints requieren autenticación
+router.use(autenticar);
 
 // POST /api/productos — crear, solo admin
 router.post('/', rol('admin'), productoController.crearProducto.bind(productoController));

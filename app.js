@@ -5,7 +5,7 @@ import { connectDB, isMongoUp } from './src/config/db.js';
 import { connectRedis, isRedisUp } from './src/config/redis.js';
 import { errorHandler } from './src/middlewares/errorHandler.js';
 import swaggerSpec from './src/config/swagger.js';
-// import cors from 'cors';
+import cors from 'cors';
 
 // Importar rutas
 import authRoutes from './src/modules/auth/auth.routes.js';
@@ -18,7 +18,7 @@ const app = express();
 // Middleware global
 app.use(express.json());
 
-// app.use(cors({ origin: 'http://localhost:5173' }));
+app.use(cors({ origin: 'http://localhost:5173' }));
 
 // Conectar bases de datos
 export const setupDatabases = async () => {
