@@ -21,7 +21,7 @@ const routes = [
         path: "/login",
         name: "login",
         component: LoginView,
-        meta: { titulo: "Iniciar sesion", soloInvitados: true },
+        meta: { titulo: "Iniciar sesion" },
     },
     {
         path: "/admin",
@@ -48,9 +48,6 @@ router.beforeEach((to) => {
     if (to.meta.requiereAuth && !auth.estaAutenticado) {
         Notify.create({ type: "negative", message: "Debes iniciar sesion", icon: "lock" });
         return { name: "login" };
-    }
-    if (to.meta.soloInvitados && auth.estaAutenticado) {
-        return { name: "admin-productos" };
     }
     return true;
 });
