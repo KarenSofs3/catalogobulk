@@ -10,6 +10,8 @@ router.use(autenticar);
 
 router.get('/', categoriaController.obtenerCategorias.bind(categoriaController));
 router.get('/:slug', categoriaController.obtenerCategoria.bind(categoriaController));
+router.post('/', rol('admin'), categoriaController.crearCategoria.bind(categoriaController));
 router.put('/:id', rol('admin'), categoriaController.actualizarCategoria.bind(categoriaController));
+router.delete('/:id', rol('admin'), categoriaController.eliminarCategoria.bind(categoriaController));
 
 export default router;

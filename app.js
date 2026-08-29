@@ -12,6 +12,7 @@ import authRoutes from './src/modules/auth/auth.routes.js';
 import productoRoutes from './src/modules/productos/producto.routes.js';
 import proveedorRoutes from './src/modules/proveedores/proveedor.routes.js';
 import categoriaRoutes from './src/modules/categorias/categoria.routes.js';
+import usuarioRoutes from './src/modules/usuarios/usuario.routes.js';
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/productos', productoRoutes);
 app.use('/api/proveedores', proveedorRoutes);
 app.use('/api/categorias', categoriaRoutes);
+app.use('/api/usuarios', usuarioRoutes);
 
 // Documentación Swagger
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

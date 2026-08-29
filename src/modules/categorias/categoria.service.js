@@ -29,6 +29,36 @@ class CategoriaService {
         return await categoriaRepository.update(id, updateData);
     }
 
+    async crearCategoria({ slug, nombre, descripcion, imagenUrl }) {
+        if (!slug || !slug.trim()) {
+            throw new AppError('Slug es requerido', 400, 'SLUG_REQUERIDO');
+        }
+        if (!nombre || !nombre.trim()) {
+            throw new AppError('Nombre es requerido', 400, 'NOMBRE_REQUERIDO');
+        }
+
+        const slugNormalizado = slug.trim().toLowerCase();
+        const existe = await categoriaRepository.findBySlug(slugNormalizado);
+        if (existe) {
+            throw new AppError('El slug de la categoría ya está registrado', 409, 'CATEGORIA_DUPLICADA');
+        }
+
+        return await categoriaRepository.create({
+            slug: slugNormalizado,
+            nombre: nombre.trim(),
+            descripcion: descripcion && descripcion.trim() ? descripcion.trim() : null,
+            imagenUrl: imagenUrl && imagenUrl.trim() ? imagenUrl.trim() : null
+        });
+    }
+
+    async eliminarCategoria(id) {
+        const categoria = await categoriaRepository.findById(id);
+        if (!categoria) {
+            throw new AppError('Categoría no encontrada', 404, 'CATEGORIA_NO_ENCONTRADA');
+        }
+        await categoriaRepository.delete(id);
+    }
+
     /**
      * Crear o actualizar categoría (upsert).
      * Usado internamente por el import.

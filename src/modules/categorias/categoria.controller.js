@@ -30,6 +30,25 @@ class CategoriaController {
             next(error);
         }
     }
+
+    async crearCategoria(req, res, next) {
+        try {
+            const categoria = await categoriaService.crearCategoria(req.body);
+            res.status(201).json(categoria);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async eliminarCategoria(req, res, next) {
+        try {
+            const { id } = req.params;
+            await categoriaService.eliminarCategoria(id);
+            res.status(204).send();
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 export const categoriaController = new CategoriaController();
