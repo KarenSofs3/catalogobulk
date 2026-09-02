@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/store/Auth";
 
@@ -19,6 +19,18 @@ const tituloActual = computed(() => {
     return opcion?.etiqueta ?? "Panel";
 });
 
+// Estado del drawer: se guarda en localStorage para que recuerde si estaba abierto o cerrado
+const CLAVE_DRAWER = "panel-drawer-abierto";
+const drawerAbierto = ref(localStorage.getItem(CLAVE_DRAWER) !== "false");
+
+watch(drawerAbierto, (valor) => {
+    localStorage.setItem(CLAVE_DRAWER, String(valor));
+});
+
+const alternarDrawer = () => {
+    drawerAbierto.value = !drawerAbierto.value;
+};
+
 const cerrarSesion = () => {
     auth.cerrarSesion();
     router.push({ name: "login" });
@@ -26,8 +38,14 @@ const cerrarSesion = () => {
 </script>
 
 <template>
-    <q-layout view="lHh Lpr lFf">
-        <q-drawer show-if-above :width="220" class="barra-lateral" :breakpoint="0">
+    <q-layout view="lHh Lpr lFf" class="pantalla-catalogo">
+        <q-drawer
+            v-model="drawerAbierto"
+            :width="220"
+            class="barra-lateral"
+            :breakpoint="1024"
+            bordered
+        >
             <div class="marca-panel">
                 <div class="icono-marca">
                     <q-icon name="grid_view" size="16px" />
@@ -49,6 +67,14 @@ const cerrarSesion = () => {
 
         <q-header class="encabezado-panel" bordered>
             <q-toolbar>
+                <q-btn
+                    flat
+                    round
+                    dense
+                    icon="menu"
+                    class="boton-menu"
+                    @click="alternarDrawer"
+                />
                 <q-toolbar-title class="titulo-seccion">{{ tituloActual }}</q-toolbar-title>
                 <div class="usuario-sesion">
                     <span class="correo-usuario">{{ auth.usuario?.rol }}</span>
@@ -64,9 +90,26 @@ const cerrarSesion = () => {
 </template>
 
 <style scoped lang="scss">
+.pantalla-catalogo {
+    --bg-base: #f4f6f9;
+    --bg-surface: #ffffff;
+    --bg-surface-2: #eef1f6;
+    --marca-oscura: #101c2e;
+    --borde: #e3e7ee;
+    --texto-principal: #101826;
+    --texto-muted: #5b6b82;
+    --texto-tenue: #93a1b5;
+    --acento: #0d9488;
+    --acento-suave: #e3f6f3;
+    --calido: #e0552f;
+    --calido-suave: #fdece6;
+    --filtro-titulo: #0E2B52;
+}
+
 .barra-lateral {
-    background: #0a1f33;
-    color: #f2f8fc;
+    background: var(--bg-surface);
+    color: var(--filtro-titulo);
+    border-right: 1px solid var(--borde);
 }
 
 .marca-panel {
@@ -80,45 +123,68 @@ const cerrarSesion = () => {
     width: 30px;
     height: 30px;
     border-radius: 9px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: var(--bg-surface-2);
+    border: 1px solid var(--borde);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #bfe0f5;
+    color: var(--filtro-titulo);
 }
 
 .nombre-marca {
     font-weight: 600;
     font-size: 14.5px;
-    color: #f2f8fc;
+    color: var(--filtro-titulo);
 }
 
 .menu-lateral {
     padding: 0 10px;
 }
 
+// Ítems inactivos: letra e ícono en --filtro-titulo sobre la barra clara,
+// bien visibles por el contraste con el fondo blanco.
 .opcion-menu {
     border-radius: 10px;
     margin-bottom: 3px;
-    color: #9fbedb;
+    color: var(--filtro-titulo);
     min-height: 40px;
+
+    .q-icon {
+        color: var(--filtro-titulo);
+    }
 }
 
+.opcion-menu:hover:not(.opcion-activa) {
+    background: var(--bg-surface-2);
+}
+
+// Al elegir la opción: el contenedor se pinta de --filtro-titulo y la letra queda blanca.
 .opcion-activa {
-    background: rgba(143, 211, 244, 0.15);
-    color: #f2f8fc;
-    border-left: 3px solid #8fd3f4;
+    background: var(--filtro-titulo) !important;
+    color: #ffffff !important;
+
+    &,
+    .q-item__label,
+    .q-icon {
+        color: #ffffff !important;
+    }
+}
+
+.boton-menu {
+    color: var(--texto-principal);
+    margin-right: 6px;
 }
 
 .encabezado-panel {
-    background: #ffffff;
-    color: #1e2a3a;
+    background: var(--bg-surface);
+    color: var(--texto-principal);
+    border-bottom: 1px solid var(--borde);
 }
 
 .titulo-seccion {
     font-size: 15px;
     font-weight: 500;
+    color: var(--filtro-titulo);
 }
 
 .usuario-sesion {
@@ -126,12 +192,12 @@ const cerrarSesion = () => {
     align-items: center;
     gap: 10px;
     font-size: 12.5px;
-    color: #6b7b90;
+    color: var(--texto-muted);
     text-transform: capitalize;
 }
 
 .fondo-contenido {
-    background: #f4f7fb;
+    background: var(--bg-base);
     min-height: 100vh;
 }
 </style>

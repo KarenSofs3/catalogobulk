@@ -1,13 +1,13 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { get, post, put, del } from "@/services/api.services";
+import { get, post, put } from "@/services/api.services";
 import { useNotificar } from "@/composables/useNotificar";
 import { useConfirmar } from "@/composables/useConfirmar";
 import { useAuthStore } from "@/store/Auth";
-import { formatearFecha } from "@/utils/formatDate";
 import { requerido, emailValido, minimoCaracteres } from "@/utils/reglas";
 import EncabezadoPagina from "@/components/Encabezados/EncabezadoPagina.vue";
 import TablaDatos from "@/components/Tablas/TablaDatos.vue";
+import DialogoFormulario from "@/components/Dialogos/DialogoFormulario.vue";
 
 const auth = useAuthStore();
 const { notificarOk, notificarError } = useNotificar();
@@ -70,25 +70,27 @@ const stats = computed(() => [
 const columnas = [
     { name: "usuario", label: "Usuario", field: "email", align: "left", sortable: true },
     { name: "rol", label: "Rol", field: "rol", align: "left" },
-    { name: "createdAt", label: "Fecha de registro", field: "createdAt", align: "left", sortable: true },
-    { name: "updatedAt", label: "Ultima actualizacion", field: "updatedAt", align: "left" },
-    { name: "acciones", label: "Acciones", field: "acciones", align: "center" },
+    { name: "estado", label: "Estado", field: "activo", align: "center" },
+    { name: "acciones", label: "Editar", field: "acciones", align: "center" },
 ];
 
 // ---- Dialog crear / editar ----
 const dialogoAbierto = ref(false);
 const editando = ref(false);
 const enviando = ref(false);
+const mostrarPassword = ref(false);
 const form = ref({ _id: null, email: "", password: "", rol: "user" });
 
 const abrirCrear = () => {
     editando.value = false;
+    mostrarPassword.value = false;
     form.value = { _id: null, email: "", password: "", rol: "user" };
     dialogoAbierto.value = true;
 };
 
 const abrirEditar = (usuario) => {
     editando.value = true;
+    mostrarPassword.value = false;
     form.value = { ...usuario, password: "" };
     dialogoAbierto.value = true;
 };
@@ -98,6 +100,7 @@ const guardar = async () => {
     try {
         const payload = { email: form.value.email.trim(), rol: form.value.rol };
         if (form.value.password) payload.password = form.value.password;
+        if (!editando.value) payload.activo = true;
 
         if (editando.value) {
             await put(`/usuarios/${form.value._id}`, payload);
@@ -115,18 +118,23 @@ const guardar = async () => {
     }
 };
 
-const eliminar = async (usuario) => {
+// Cambio de estado con doble confirmacion: primero el clic en el boton,
+// luego el dialogo de confirmar antes de aplicar el cambio.
+const cambiarEstado = async (usuario) => {
+    const activar = !usuario.activo;
     const ok = await confirmar({
-        titulo: "Eliminar usuario",
-        mensaje: `Vas a eliminar la cuenta "${usuario.email}". Esta accion no se puede deshacer.`,
+        titulo: activar ? "Activar usuario" : "Desactivar usuario",
+        mensaje: `Vas a ${activar ? "activar" : "desactivar"} la cuenta "${usuario.email}". ¿Deseas continuar?`,
+        textoOk: activar ? "Si, activar" : "Si, desactivar",
+        color: activar ? "positive" : "negative",
     });
     if (!ok) return;
     try {
-        await del(`/usuarios/${usuario._id}`);
-        notificarOk("Usuario eliminado");
-        await cargarUsuarios();
+        await put(`/usuarios/${usuario._id}`, { activo: activar });
+        usuario.activo = activar;
+        notificarOk(activar ? "Usuario activado" : "Usuario desactivado");
     } catch (e) {
-        notificarError(e.mensaje || "No se pudo eliminar el usuario");
+        notificarError(e.mensaje || "No se pudo actualizar el estado");
     }
 };
 
@@ -142,7 +150,7 @@ onMounted(cargarUsuarios);
             :stats="stats"
         >
             <template #acciones>
-                <q-btn unelevated no-caps color="primary" icon="add" label="Nuevo usuario" @click="abrirCrear" />
+                <q-btn unelevated no-caps color="primary" class="boton-principal-radio" icon="add" label="Nuevo usuario" @click="abrirCrear" />
             </template>
         </EncabezadoPagina>
 
@@ -160,6 +168,7 @@ onMounted(cargarUsuarios);
                     outlined
                     debounce="200"
                     placeholder="Buscar por correo electronico..."
+                    class="campo-radio-uniforme"
                     style="max-width: 300px"
                 >
                     <template #prepend><q-icon name="search" /></template>
@@ -170,6 +179,7 @@ onMounted(cargarUsuarios);
                     outlined
                     emit-value
                     map-options
+                    class="campo-radio-uniforme"
                     :options="opcionesRolFiltro"
                     style="min-width: 200px"
                     @update:model-value="cargarUsuarios"
@@ -196,86 +206,90 @@ onMounted(cargarUsuarios);
                 </q-td>
             </template>
 
-            <template #body-cell-createdAt="props">
-                <q-td :props="props">{{ formatearFecha(props.value) }}</q-td>
-            </template>
-
-            <template #body-cell-updatedAt="props">
-                <q-td :props="props">{{ formatearFecha(props.value) }}</q-td>
+            <template #body-cell-estado="props">
+                <q-td :props="props" auto-width>
+                    <q-btn
+                        unelevated
+                        dense
+                        no-caps
+                        size="sm"
+                        class="boton-estado"
+                        :color="props.value ? 'positive' : 'negative'"
+                        :icon="props.value ? 'toggle_on' : 'toggle_off'"
+                        :label="props.value ? 'Activo' : 'Inactivo'"
+                        :disable="props.row._id === auth.usuario?.id"
+                        @click="cambiarEstado(props.row)"
+                    >
+                        <q-tooltip v-if="props.row._id === auth.usuario?.id">
+                            No puedes desactivar tu propia cuenta
+                        </q-tooltip>
+                    </q-btn>
+                </q-td>
             </template>
 
             <template #body-cell-acciones="props">
                 <q-td :props="props" auto-width>
                     <q-btn flat round dense icon="edit" size="sm" @click="abrirEditar(props.row)" />
-                    <q-btn
-                        flat
-                        round
-                        dense
-                        icon="delete"
-                        color="negative"
-                        size="sm"
-                        :disable="props.row._id === auth.usuario?.id"
-                        @click="eliminar(props.row)"
-                    >
-                        <q-tooltip v-if="props.row._id === auth.usuario?.id">
-                            No puedes eliminar tu propia cuenta
-                        </q-tooltip>
-                    </q-btn>
                 </q-td>
             </template>
         </TablaDatos>
 
-        <q-dialog v-model="dialogoAbierto" persistent>
-            <q-card style="width: 460px; max-width: 95vw" class="tarjeta-dialogo">
-                <q-card-section>
-                    <div class="text-h6">{{ editando ? "Editar usuario" : "Nuevo usuario" }}</div>
-                </q-card-section>
-
-                <q-form @submit="guardar">
-                    <q-card-section class="q-gutter-md">
-                        <q-input
-                            v-model="form.email"
-                            outlined
-                            dense
-                            type="email"
-                            label="Correo electronico *"
-                            :rules="[requerido('El correo'), emailValido()]"
-                            lazy-rules
-                        />
-                        <q-input
-                            v-model="form.password"
-                            outlined
-                            dense
-                            type="password"
-                            :label="editando ? 'Nueva contrasena (opcional)' : 'Contrasena *'"
-                            :hint="editando ? 'Dejar vacio para mantener la actual' : 'Minimo 6 caracteres'"
-                            :rules="editando ? [minimoCaracteres(6)] : [requerido('La contrasena'), minimoCaracteres(6)]"
-                            lazy-rules
-                        />
-                        <q-select
-                            v-model="form.rol"
-                            outlined
-                            dense
-                            emit-value
-                            map-options
-                            label="Rol *"
-                            :options="opcionesRolFormulario"
-                            :rules="[requerido('El rol')]"
-                            lazy-rules
-                        />
-                    </q-card-section>
-
-                    <q-card-actions align="right" class="q-px-md q-pb-md">
-                        <q-btn flat no-caps label="Cancelar" @click="dialogoAbierto = false" />
-                        <q-btn unelevated no-caps color="primary" type="submit" label="Guardar" :loading="enviando" />
-                    </q-card-actions>
-                </q-form>
-            </q-card>
-        </q-dialog>
+        <DialogoFormulario
+            v-model="dialogoAbierto"
+            :icono="editando ? 'edit' : 'person_add'"
+            :titulo="editando ? 'Editar usuario' : 'Nuevo usuario'"
+            subtitulo="Administra las cuentas y roles del sistema"
+            ancho="480px"
+            :enviando="enviando"
+            @submit="guardar"
+        >
+            <q-input
+                v-model="form.email"
+                outlined
+                type="email"
+                label="Correo electronico *"
+                :rules="[requerido('El correo'), emailValido()]"
+                lazy-rules
+            />
+            <q-input
+                v-model="form.password"
+                outlined
+                :type="mostrarPassword ? 'text' : 'password'"
+                :label="editando ? 'Nueva contrasena (opcional)' : 'Contrasena *'"
+                :hint="editando ? 'Dejar vacio para mantener la actual' : 'Minimo 6 caracteres'"
+                :rules="editando ? [minimoCaracteres(6)] : [requerido('La contrasena'), minimoCaracteres(6)]"
+                lazy-rules
+            >
+                <template #append>
+                    <q-icon
+                        :name="mostrarPassword ? 'visibility_off' : 'visibility'"
+                        class="cursor-pointer"
+                        @click="mostrarPassword = !mostrarPassword"
+                    />
+                </template>
+            </q-input>
+            <q-select
+                v-model="form.rol"
+                outlined
+                emit-value
+                map-options
+                label="Rol *"
+                :options="opcionesRolFormulario"
+                :rules="[requerido('El rol')]"
+                lazy-rules
+            />
+            <div v-if="!editando" class="aviso-estado-inicial">
+                <q-icon name="info" size="16px" />
+                Los usuarios nuevos se crean como <strong>activos</strong>. Puedes cambiar el estado despues
+                desde el boton en la tabla.
+            </div>
+        </DialogoFormulario>
     </q-page>
 </template>
 
 <style scoped lang="scss">
+@import "@/styles/variables.scss";
+
 .tarjeta-dialogo {
     border-radius: 16px;
 }
@@ -289,5 +303,16 @@ onMounted(cargarUsuarios);
 .avatar-usuario {
     font-size: 12px;
     font-weight: 600;
+}
+
+.aviso-estado-inicial {
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12.5px;
+    color: $texto-suave;
+    background: $fondo;
+    border-radius: 10px;
+    padding: 10px 12px;
+    line-height: 1.4;
 }
 </style>

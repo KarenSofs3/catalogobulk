@@ -1,32 +1,24 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { onMounted, ref, computed } from "vue";
 import { get } from "@/services/api.services";
 
-const router = useRouter();
-
 const productos = ref([]);
-const categorias = ref([]);
-const proveedores = ref([]);
 const cargando = ref(true);
 const error = ref(false);
 
-const textoBusqueda = ref("");
-const categoriasSeleccionadas = ref([]);
-const proveedoresSeleccionados = ref([]);
+const busqueda = ref("");
+const categoriasActivas = ref([]);
+const proveedoresActivos = ref([]);
+const orden = ref("nombre-asc");
+const vista = ref("grid");
+const expandido = ref(null);
 
-const cargarDatos = async () => {
+const cargarProductos = async () => {
     cargando.value = true;
     error.value = false;
     try {
-        const [respProductos, respCategorias, respProveedores] = await Promise.all([
-            get("/productos?limit=100"),
-            get("/categorias"),
-            get("/proveedores?limit=100"),
-        ]);
-        productos.value = respProductos.data;
-        categorias.value = respCategorias;
-        proveedores.value = respProveedores.data;
+        const respuesta = await get("/productos");
+        productos.value = respuesta.data;
     } catch (e) {
         error.value = true;
     } finally {
@@ -34,132 +26,160 @@ const cargarDatos = async () => {
     }
 };
 
-const alternarCategoria = (slug) => {
-    const i = categoriasSeleccionadas.value.indexOf(slug);
-    if (i === -1) categoriasSeleccionadas.value.push(slug);
-    else categoriasSeleccionadas.value.splice(i, 1);
-};
+const nombreCategoria = (p) => p.categoria ?? "Sin categoría";
+const capitalizar = (texto) => texto.charAt(0).toUpperCase() + texto.slice(1);
+const nombreProveedor = (p) => p.proveedorId?.nombre ?? "Sin proveedor";
+const disponible = (p) => (p.stock ?? 0) > 0;
 
-const alternarProveedor = (id) => {
-    const i = proveedoresSeleccionados.value.indexOf(id);
-    if (i === -1) proveedoresSeleccionados.value.push(id);
-    else proveedoresSeleccionados.value.splice(i, 1);
-};
+const categorias = computed(() => [...new Set(productos.value.map(nombreCategoria))]);
+const proveedores = computed(() => [...new Set(productos.value.map(nombreProveedor))]);
 
 const limpiarFiltros = () => {
-    textoBusqueda.value = "";
-    categoriasSeleccionadas.value = [];
-    proveedoresSeleccionados.value = [];
+    categoriasActivas.value = [];
+    proveedoresActivos.value = [];
+    busqueda.value = "";
 };
 
-const hayFiltrosActivos = computed(
-    () =>
-        textoBusqueda.value.trim() !== "" ||
-        categoriasSeleccionadas.value.length > 0 ||
-        proveedoresSeleccionados.value.length > 0
-);
-
 const productosFiltrados = computed(() => {
-    const texto = textoBusqueda.value.trim().toLowerCase();
-    return productos.value.filter((p) => {
-        const coincideTexto = !texto || p.nombre.toLowerCase().includes(texto);
-        const coincideCategoria =
-            categoriasSeleccionadas.value.length === 0 ||
-            categoriasSeleccionadas.value.includes(p.categoria);
-        const coincideProveedor =
-            proveedoresSeleccionados.value.length === 0 ||
-            proveedoresSeleccionados.value.includes(p.proveedorId?._id);
+    const filtrados = productos.value.filter((p) => {
+        const coincideTexto = p.nombre?.toLowerCase().includes(busqueda.value.toLowerCase());
+        const coincideCategoria = !categoriasActivas.value.length || categoriasActivas.value.includes(nombreCategoria(p));
+        const coincideProveedor = !proveedoresActivos.value.length || proveedoresActivos.value.includes(nombreProveedor(p));
         return coincideTexto && coincideCategoria && coincideProveedor;
     });
+
+    const [campo, direccion] = orden.value.split("-");
+    return [...filtrados].sort((a, b) => {
+        const valorA = campo === "precio" ? a.precio : a.nombre.toLowerCase();
+        const valorB = campo === "precio" ? b.precio : b.nombre.toLowerCase();
+        if (valorA < valorB) return direccion === "asc" ? -1 : 1;
+        if (valorA > valorB) return direccion === "asc" ? 1 : -1;
+        return 0;
+    });
 });
+
+const alternarDescripcion = (id) => {
+    expandido.value = expandido.value === id ? null : id;
+};
 
 const formatoPrecio = (valor) =>
     new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(valor);
 
-const irALogin = () => {
-    router.push({ name: "login" });
-};
-
-onMounted(cargarDatos);
+onMounted(cargarProductos);
 </script>
 
 <template>
     <div class="pantalla-catalogo">
-        <header class="barra-superior">
+        <header class="encabezado">
             <div class="marca">
-                <div class="icono-marca">
-                    <q-icon name="grid_view" size="17px" />
-                </div>
-                <span class="nombre-marca">Mi catalogo</span>
+                <span class="marca-icono">◈</span>
+                <span class="marca-texto">Catálogo</span>
             </div>
-
             <div class="buscador">
-                <q-icon name="search" size="18px" class="icono-buscar" />
-                <input v-model="textoBusqueda" type="text" placeholder="Buscar productos..." class="input-buscar" />
+                <span class="buscador-icono">⌕</span>
+                <input v-model="busqueda" type="text" placeholder="Buscar productos..." />
             </div>
-
-            <q-btn unelevated no-caps class="boton-login" label="Iniciar sesion" icon="login" @click="irALogin" />
         </header>
 
         <div class="cuerpo">
             <aside class="filtros">
-                <div class="bloque-filtro">
-                    <div class="titulo-filtro">Categorias</div>
-                    <label v-for="c in categorias" :key="c.slug" class="opcion-filtro">
-                        <input type="checkbox" :checked="categoriasSeleccionadas.includes(c.slug)"
-                            @change="alternarCategoria(c.slug)" />
-                        <span>{{ c.nombre }}</span>
-                    </label>
+                <div class="bloque-filtro" v-if="categorias.length">
+                    <div class="titulo-filtro">Categorías</div>
+                    <q-checkbox
+                        v-for="cat in categorias"
+                        :key="cat"
+                        v-model="categoriasActivas"
+                        :val="cat"
+                        :label="capitalizar(cat)"
+                        color="teal"
+                        dense
+                        class="opcion-filtro"
+                    />
                 </div>
 
-                <div class="bloque-filtro">
+                <div class="bloque-filtro" v-if="proveedores.length">
                     <div class="titulo-filtro">Proveedores</div>
-                    <label v-for="p in proveedores" :key="p._id" class="opcion-filtro">
-                        <input type="checkbox" :checked="proveedoresSeleccionados.includes(p._id)"
-                            @change="alternarProveedor(p._id)" />
-                        <span>{{ p.nombre }}</span>
-                    </label>
+                    <q-checkbox
+                        v-for="prov in proveedores"
+                        :key="prov"
+                        v-model="proveedoresActivos"
+                        :val="prov"
+                        :label="prov"
+                        color="teal"
+                        dense
+                        class="opcion-filtro"
+                    />
                 </div>
 
-                <div v-if="hayFiltrosActivos" class="limpiar-filtros" @click="limpiarFiltros">
-                    Limpiar filtros
-                </div>
+                <button v-if="categoriasActivas.length || proveedoresActivos.length || busqueda" class="boton-limpiar" @click="limpiarFiltros">
+                    Quitar filtros
+                </button>
             </aside>
 
-            <main class="contenido-productos">
-                <div v-if="cargando" class="estado-carga">
-                    <q-spinner-dots color="primary" size="32px" />
+            <main class="principal">
+                <section class="banner-catalogo">
+                    <span class="banner-icono">◈</span>
+                    <div class="banner-titulo">Bienvenido a nuestro catálogo</div>
+                    <p class="banner-texto">
+                        Explora todos nuestros productos, filtra por categoría o proveedor y encuentra justo lo que necesitas.
+                    </p>
+                </section>
+
+                <div v-if="cargando" class="estado estado-carga">
+                    <div class="spinner"></div>
+                    <span>Cargando catálogo</span>
                 </div>
 
-                <div v-else-if="error" class="estado-error">
-                    No se pudo cargar el catalogo. Intenta de nuevo mas tarde.
+                <div v-else-if="error" class="estado estado-error">
+                    <span class="estado-icono">!</span>
+                    <div>
+                        <div class="estado-titulo">No se pudo cargar el catálogo</div>
+                        <div class="estado-detalle">Revisa tu conexión e intenta de nuevo.</div>
+                    </div>
                 </div>
 
                 <template v-else>
-                    <div class="resumen-resultados">
-                        {{ productosFiltrados.length }} producto{{ productosFiltrados.length === 1 ? "" : "s" }}
-                    </div>
-
-                    <div v-if="productosFiltrados.length === 0" class="sin-resultados">
-                        No encontramos productos con esos filtros.
-                    </div>
-
-                    <div v-else class="grilla">
-                        <div v-for="producto in productosFiltrados" :key="producto._id" class="tarjeta-producto">
-                            <div class="imagen-producto">
-                                <q-img v-if="producto.imagenUrl" :src="producto.imagenUrl" class="full-height"
-                                    fit="cover" />
-                                <q-icon v-else name="inventory_2" size="30px" color="white" />
-                                <q-badge :color="producto.stock > 0 ? 'positive' : 'negative'" class="insignia-stock">
-                                    {{ producto.stock > 0 ? "Disponible" : "Agotado" }}
-                                </q-badge>
+                    <div class="barra-controles">
+                        <div class="contador">{{ productosFiltrados.length }} producto{{ productosFiltrados.length === 1 ? '' : 's' }}</div>
+                        <div class="controles-derecha">
+                            <div class="toggle-vista">
+                                <button :class="{ activo: vista === 'grid' }" @click="vista = 'grid'" title="Vista de cuadrícula">▦</button>
+                                <button :class="{ activo: vista === 'lista' }" @click="vista = 'lista'" title="Vista de lista">☰</button>
                             </div>
-                            <div class="info-producto">
-                                <div class="nombre-producto">{{ producto.nombre }}</div>
-                                <div class="proveedor-producto" v-if="producto.proveedorId?.nombre">
-                                    {{ producto.proveedorId.nombre }}
+                            <select v-model="orden" class="selector-orden">
+                                <option value="nombre-asc">Nombre A-Z</option>
+                                <option value="nombre-desc">Nombre Z-A</option>
+                                <option value="precio-asc">Precio: menor a mayor</option>
+                                <option value="precio-desc">Precio: mayor a menor</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div v-if="!productosFiltrados.length" class="estado estado-vacio">
+                        <div class="estado-titulo">Sin resultados</div>
+                        <div class="estado-detalle">Ajusta la búsqueda o quita algún filtro.</div>
+                    </div>
+
+                    <div v-else class="grilla" :class="{ 'grilla-lista': vista === 'lista' }">
+                        <div v-for="producto in productosFiltrados" :key="producto._id" class="tarjeta">
+                            <div class="tarjeta-imagen">
+                                <q-img v-if="producto.imagenUrl" :src="producto.imagenUrl" class="full-height" fit="contain" />
+                                <div v-else class="marcador-textura"></div>
+                            </div>
+                            <div class="tarjeta-info">
+                                <div class="tarjeta-etiquetas">
+                                    <span class="etiqueta etiqueta-categoria">{{ capitalizar(nombreCategoria(producto)) }}</span>
+                                    <span class="etiqueta" :class="disponible(producto) ? 'etiqueta-disponible' : 'etiqueta-agotado'">
+                                        {{ disponible(producto) ? `Stock: ${producto.stock}` : 'Agotado' }}
+                                    </span>
                                 </div>
-                                <div class="precio-producto">{{ formatoPrecio(producto.precio) }}</div>
+                                <div class="tarjeta-nombre">{{ producto.nombre }}</div>
+                                <div class="tarjeta-proveedor">{{ nombreProveedor(producto) }}</div>
+                                <div class="tarjeta-precio">{{ formatoPrecio(producto.precio) }}</div>
+                                <button v-if="producto.descripcion" class="boton-ver-mas" @click="alternarDescripcion(producto._id)">
+                                    {{ expandido === producto._id ? 'Ver menos' : 'Ver más' }}
+                                </button>
+                                <p v-if="expandido === producto._id" class="tarjeta-descripcion">{{ producto.descripcion }}</p>
                             </div>
                         </div>
                     </div>
@@ -170,113 +190,151 @@ onMounted(cargarDatos);
 </template>
 
 <style scoped lang="scss">
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap");
+
 .pantalla-catalogo {
+    --bg-base: #f4f6f9;
+    --bg-surface: #ffffff;
+    --bg-surface-2: #eef1f6;
+    --marca-oscura: #101c2e;
+    --borde: #e3e7ee;
+    --texto-principal: #101826;
+    --texto-muted: #5b6b82;
+    --texto-tenue: #93a1b5;
+    --acento: #0d9488;
+    --acento-suave: #e3f6f3;
+    --calido: #e0552f;
+    --calido-suave: #fdece6;
+    --filtro-titulo: #101c2e;
+
     min-height: 100vh;
-    background: #f4f7fb;
+    background: var(--bg-base);
+    color: var(--texto-principal);
+    font-family: "Inter", sans-serif;
 }
 
-.barra-superior {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    height: 64px;
-    background: #ffffff;
-    border-bottom: 1px solid #e4eaf1;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    padding: 0 24px;
-}
-
-.marca {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    flex-shrink: 0;
-}
-
-.icono-marca {
-    width: 32px;
-    height: 32px;
-    border-radius: 9px;
-    background: #0e2b52;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #8fd3f4;
-}
-
-.nombre-marca {
-    font-weight: 700;
-    font-size: 15.5px;
-    color: #14213d;
-}
-
-.buscador {
-    flex: 1;
-    max-width: 420px;
+.encabezado {
     position: relative;
     display: flex;
     align-items: center;
+    justify-content: center;
+    padding: 16px 32px;
+    background: var(--marca-oscura);
 }
 
-.icono-buscar {
+.marca {
     position: absolute;
-    left: 12px;
-    color: #9aabc0;
+    left: 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    white-space: nowrap;
+    color: #ffffff;
 }
 
-.input-buscar {
+.marca-icono {
+    color: var(--acento);
+    font-size: 20px;
+}
+
+.buscador {
     width: 100%;
-    height: 40px;
+    max-width: 640px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 10px;
-    border: 1px solid #e4eaf1;
-    background: #f4f7fb;
-    padding: 0 14px 0 38px;
-    font-size: 13.5px;
-    font-family: inherit;
-    color: #14213d;
-    outline: none;
+    padding: 10px 16px;
     transition: border-color 0.15s ease;
 
-    &:focus {
-        border-color: #8fd3f4;
-        background: #ffffff;
+    &:focus-within {
+        border-color: var(--acento);
     }
 }
 
-.boton-login {
-    margin-left: auto;
-    background: #0e2b52;
-    color: #eaf4fb;
-    border-radius: 10px;
-    padding: 8px 18px;
+.buscador-icono {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.buscador input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: #ffffff;
+    font-family: "Inter", sans-serif;
+    font-size: 14px;
+
+    &::placeholder {
+        color: rgba(255, 255, 255, 0.45);
+    }
+}
+
+// ─── Banner tipo "hero" (inspirado en el banner de bienvenida de Docker Hub),
+// con los colores propios del catalogo en vez de los de Docker.
+// Vive dentro de .principal, asi que su ancho es el mismo que el de la grilla de productos.
+.banner-catalogo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+    padding: 40px 32px;
+    background: var(--marca-oscura);
+    border-radius: 16px;
+    margin-bottom: 24px;
+}
+
+.banner-icono {
+    font-size: 24px;
+    color: var(--acento);
+    margin-bottom: 4px;
+}
+
+.banner-titulo {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
+    font-size: 26px;
+    color: #ffffff;
+    line-height: 1.2;
+}
+
+.banner-texto {
+    max-width: 460px;
     font-size: 13.5px;
-    flex-shrink: 0;
+    color: rgba(255, 255, 255, 0.65);
+    line-height: 1.5;
+    margin: 0;
 }
 
 .cuerpo {
     display: flex;
-    align-items: flex-start;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 24px 20px 48px;
-    gap: 24px;
+    padding: 24px 32px 56px;
+    gap: 32px;
+    align-items: flex-start;
 }
 
 .filtros {
-    width: 220px;
+    width: 230px;
     flex-shrink: 0;
-    background: #ffffff;
-    border: 1px solid #e4eaf1;
+    background: var(--bg-surface);
+    border: 1px solid var(--borde);
     border-radius: 14px;
-    padding: 18px;
-    position: sticky;
-    top: 88px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(16, 24, 38, 0.04);
 }
 
 .bloque-filtro {
-    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 22px;
 
     &:last-of-type {
         margin-bottom: 12px;
@@ -284,135 +342,315 @@ onMounted(cargarDatos);
 }
 
 .titulo-filtro {
+    font-family: "Space Grotesk", sans-serif;
     font-size: 12px;
     font-weight: 700;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #6b7b90;
-    margin-bottom: 10px;
+    color: var(--filtro-titulo);
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--acento-suave);
 }
 
 .opcion-filtro {
-    display: flex;
-    align-items: center;
-    gap: 8px;
     font-size: 13.5px;
-    color: #33415c;
-    padding: 5px 0;
-    cursor: pointer;
-
-    input {
-        accent-color: #0e2b52;
-        width: 15px;
-        height: 15px;
-        cursor: pointer;
-    }
+    color: var(--texto-muted);
 }
 
-.limpiar-filtros {
+.boton-limpiar {
+    background: none;
+    border: none;
+    color: var(--acento);
     font-size: 12.5px;
-    color: #2c6ca8;
+    font-weight: 600;
     cursor: pointer;
-    font-weight: 500;
+    padding: 0;
 
     &:hover {
         text-decoration: underline;
     }
 }
 
-.contenido-productos {
+.principal {
     flex: 1;
     min-width: 0;
+    scroll-margin-top: 24px;
 }
 
-.resumen-resultados {
-    font-size: 13px;
-    color: #6b7b90;
-    margin-bottom: 14px;
-}
-
-.estado-carga,
-.estado-error,
-.sin-resultados {
+.barra-controles {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    gap: 12px;
+}
+
+.contador {
+    font-size: 13px;
+    color: var(--texto-tenue);
+    white-space: nowrap;
+}
+
+.controles-derecha {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.toggle-vista {
+    display: flex;
+    border: 1px solid var(--borde);
+    border-radius: 8px;
+    overflow: hidden;
+
+    button {
+        background: var(--bg-surface);
+        border: none;
+        color: var(--texto-tenue);
+        padding: 6px 10px;
+        cursor: pointer;
+        font-size: 13px;
+        line-height: 1;
+
+        &.activo {
+            background: var(--acento-suave);
+            color: var(--acento);
+        }
+    }
+}
+
+.selector-orden {
+    background: var(--bg-surface);
+    border: 1px solid var(--borde);
+    border-radius: 8px;
+    color: var(--texto-principal);
+    font-size: 12.5px;
+    padding: 7px 10px;
+    outline: none;
+
+    &:focus {
+        border-color: var(--acento);
+    }
+}
+
+.estado {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 48px 24px;
+    color: var(--texto-muted);
+}
+
+.estado-vacio,
+.estado-error {
+    flex-direction: column;
+    text-align: center;
     justify-content: center;
-    padding: 60px 0;
-    color: #6b7b90;
-    font-size: 14px;
+    background: var(--bg-surface);
+    border: 1px dashed var(--borde);
+    border-radius: 14px;
+}
+
+.estado-titulo {
+    font-weight: 600;
+    color: var(--texto-principal);
+    margin-bottom: 4px;
+}
+
+.estado-detalle {
+    font-size: 13px;
+    color: var(--texto-tenue);
+}
+
+.estado-icono {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--calido-suave);
+    color: var(--calido);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--borde);
+    border-top-color: var(--acento);
+    border-radius: 50%;
+    animation: girar 0.7s linear infinite;
+}
+
+@keyframes girar {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .grilla {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 22px;
 }
 
-.tarjeta-producto {
-    background: #ffffff;
-    border: 1px solid #e4eaf1;
-    border-radius: 14px;
+.grilla-lista {
+    grid-template-columns: 1fr;
+
+    .tarjeta {
+        display: flex;
+        flex-direction: row;
+        align-items: stretch;
+        height: 200px; // alto fijo para todas las cards horizontales
+    }
+
+    .tarjeta-imagen {
+        width: 220px;
+        height: 100%; // ya no depende del contenido, toma el alto fijo del padre
+        flex-shrink: 0;
+    }
+
+    .tarjeta-info {
+        flex: 1;
+        height: 100%;
+        overflow-y: auto; // si la descripción se expande, hace scroll en vez de estirar la card
+    }
+}
+
+.tarjeta {
+    background: var(--bg-surface);
+    border: 1px solid var(--borde);
+    border-radius: 16px;
     overflow: hidden;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
 
     &:hover {
         transform: translateY(-3px);
-        box-shadow: 0 10px 24px rgba(20, 33, 61, 0.08);
+        box-shadow: 0 8px 20px rgba(16, 24, 38, 0.08);
     }
 }
 
-.imagen-producto {
+.tarjeta-imagen {
     position: relative;
-    height: 120px;
-    background: linear-gradient(135deg, #1b4c82, #2c6ca8);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    height: 240px;
+    background: var(--bg-surface-2);
 }
 
-.insignia-stock {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    font-size: 10px;
+.marcador-textura {
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(135deg, var(--bg-surface-2) 0 8px, #e3e8f0 8px 16px);
+}
+
+.tarjeta-info {
+    padding: 16px 18px 18px;
+}
+
+.tarjeta-etiquetas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.etiqueta {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 3px 8px;
+    border-radius: 999px;
+}
+
+.etiqueta-categoria {
+    background: var(--bg-surface-2);
+    color: var(--texto-muted);
     text-transform: uppercase;
 }
 
-.info-producto {
-    padding: 11px 12px 14px;
+.etiqueta-disponible {
+    background: var(--acento-suave);
+    color: var(--acento);
 }
 
-.nombre-producto {
-    font-size: 13.5px;
-    color: #14213d;
+.etiqueta-agotado {
+    background: var(--calido-suave);
+    color: var(--calido);
+}
+
+.tarjeta-nombre {
+    font-size: 15px;
     font-weight: 500;
-    line-height: 1.3;
+    color: var(--texto-principal);
 }
 
-.proveedor-producto {
-    font-size: 11.5px;
-    color: #8a99ad;
-    margin-top: 3px;
+.tarjeta-proveedor {
+    font-size: 12.5px;
+    color: var(--texto-tenue);
+    margin-top: 2px;
 }
 
-.precio-producto {
-    font-size: 14px;
-    color: #14213d;
+.tarjeta-precio {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 16px;
     font-weight: 700;
-    margin-top: 6px;
+    color: var(--acento);
+    margin-top: 10px;
 }
 
-@media (max-width: 720px) {
-    .cuerpo {
-        flex-direction: column;
+.boton-ver-mas {
+    background: none;
+    border: none;
+    color: var(--texto-muted);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 0;
+    margin-top: 8px;
+    cursor: pointer;
+
+    &:hover {
+        color: var(--acento);
+    }
+}
+
+.tarjeta-descripcion {
+    font-size: 12px;
+    color: var(--texto-muted);
+    margin-top: 6px;
+    line-height: 1.4;
+}
+
+@media (max-width: 745px) {
+    .marca {
+        position: static;
     }
 
-    .filtros {
-        width: 100%;
-        position: static;
+    .encabezado {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
     }
 
     .buscador {
         max-width: none;
+    }
+
+    .banner-catalogo {
+        padding: 40px 24px;
+    }
+
+    .banner-titulo {
+        font-size: 24px;
+    }
+
+    .cuerpo {
+        flex-direction: column;
+        padding: 20px;
+    }
+
+    .filtros {
+        width: 100%;
     }
 }
 </style>

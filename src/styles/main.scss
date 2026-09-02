@@ -1,2 +1,17 @@
 // src/styles/main.scss
-// tus estilos globales
+// tus estilos globales:root {
+:root {
+    --radio-controles: 10px;
+}
+
+.boton-principal-radio {
+    border-radius: var(--radio-controles) !important;
+}
+
+.campo-radio-uniforme .q-field__control {
+    border-radius: var(--radio-controles) !important;
+}
+
+.boton-estado {
+    border-radius: var(--radio-controles) !important;
+}

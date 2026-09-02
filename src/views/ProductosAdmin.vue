@@ -1,12 +1,13 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { get, post, put, del } from "@/services/api.services";
+import { get, post, put } from "@/services/api.services";
 import { useNotificar } from "@/composables/useNotificar";
 import { useConfirmar } from "@/composables/useConfirmar";
 import { formatearFecha } from "@/utils/formatDate";
 import { requerido, numeroNoNegativo, enteroNoNegativo, urlValida } from "@/utils/reglas";
 import EncabezadoPagina from "@/components/Encabezados/EncabezadoPagina.vue";
 import TablaDatos from "@/components/Tablas/TablaDatos.vue";
+import DialogoFormulario from "@/components/Dialogos/DialogoFormulario.vue";
 
 const { notificarOk, notificarError } = useNotificar();
 const { confirmar } = useConfirmar();
@@ -101,7 +102,8 @@ const columnas = [
     { name: "precio", label: "Precio", field: "precio", align: "right", sortable: true },
     { name: "stock", label: "Stock", field: "stock", align: "center", sortable: true },
     { name: "descripcion", label: "Descripcion", field: "descripcion", align: "left" },
-    { name: "acciones", label: "Acciones", field: "acciones", align: "center" },
+    { name: "estado", label: "Estado", field: "activo", align: "center" },
+    { name: "acciones", label: "Editar", field: "acciones", align: "center" },
 ];
 
 // ---- Dialog crear / editar ----
@@ -118,6 +120,7 @@ const vacioForm = () => ({
     proveedorId: null,
     descripcion: "",
     imagenUrl: "",
+    activo: true,
 });
 const form = ref(vacioForm());
 
@@ -149,6 +152,7 @@ const guardar = async () => {
             descripcion: form.value.descripcion?.trim() || null,
             imagenUrl: form.value.imagenUrl?.trim() || null,
         };
+        if (!editando.value) payload.activo = true;
         if (editando.value) {
             await put(`/productos/${form.value._id}`, payload);
             notificarOk("Producto actualizado");
@@ -165,18 +169,23 @@ const guardar = async () => {
     }
 };
 
-const eliminar = async (producto) => {
+// Cambio de estado con doble confirmacion: primero el clic en el boton,
+// luego el dialogo de confirmar antes de aplicar el cambio.
+const cambiarEstado = async (producto) => {
+    const activar = !producto.activo;
     const ok = await confirmar({
-        titulo: "Eliminar producto",
-        mensaje: `Vas a eliminar "${producto.nombre}". Esta accion no se puede deshacer.`,
+        titulo: activar ? "Activar producto" : "Desactivar producto",
+        mensaje: `Vas a ${activar ? "activar" : "desactivar"} "${producto.nombre}". ¿Deseas continuar?`,
+        textoOk: activar ? "Si, activar" : "Si, desactivar",
+        color: activar ? "positive" : "negative",
     });
     if (!ok) return;
     try {
-        await del(`/productos/${producto._id}`);
-        notificarOk("Producto eliminado");
-        await cargarProductos();
+        await put(`/productos/${producto._id}`, { activo: activar });
+        producto.activo = activar;
+        notificarOk(activar ? "Producto activado" : "Producto desactivado");
     } catch (e) {
-        notificarError(e.mensaje || "No se pudo eliminar el producto");
+        notificarError(e.mensaje || "No se pudo actualizar el estado");
     }
 };
 
@@ -195,7 +204,7 @@ onMounted(async () => {
             :stats="stats"
         >
             <template #acciones>
-                <q-btn unelevated no-caps color="primary" icon="add" label="Nuevo producto" @click="abrirCrear" />
+                <q-btn unelevated no-caps color="primary" class="boton-principal-radio" icon="add" label="Nuevo producto" @click="abrirCrear" />
             </template>
         </EncabezadoPagina>
 
@@ -213,6 +222,7 @@ onMounted(async () => {
                     outlined
                     debounce="200"
                     placeholder="Buscar por nombre o SKU..."
+                    class="campo-radio-uniforme"
                     style="max-width: 280px"
                 >
                     <template #prepend><q-icon name="search" /></template>
@@ -223,6 +233,7 @@ onMounted(async () => {
                     outlined
                     emit-value
                     map-options
+                    class="campo-radio-uniforme"
                     :options="opcionesCategoria"
                     style="min-width: 200px"
                     @update:model-value="cargarProductos"
@@ -233,6 +244,7 @@ onMounted(async () => {
                     outlined
                     emit-value
                     map-options
+                    class="campo-radio-uniforme"
                     :options="opcionesProveedor"
                     style="min-width: 200px"
                     @update:model-value="cargarProductos"
@@ -274,123 +286,133 @@ onMounted(async () => {
                 </q-td>
             </template>
 
+            <template #body-cell-estado="props">
+                <q-td :props="props" auto-width>
+                    <q-btn
+                        unelevated
+                        dense
+                        no-caps
+                        size="sm"
+                        class="boton-estado"
+                        :color="props.value ? 'positive' : 'negative'"
+                        :icon="props.value ? 'toggle_on' : 'toggle_off'"
+                        :label="props.value ? 'Activo' : 'Inactivo'"
+                        @click="cambiarEstado(props.row)"
+                    />
+                </q-td>
+            </template>
+
             <template #body-cell-acciones="props">
                 <q-td :props="props" auto-width>
                     <q-btn flat round dense icon="edit" size="sm" @click="abrirEditar(props.row)" />
-                    <q-btn flat round dense icon="delete" color="negative" size="sm" @click="eliminar(props.row)" />
                 </q-td>
             </template>
         </TablaDatos>
 
-        <q-dialog v-model="dialogoAbierto" persistent>
-            <q-card style="width: 520px; max-width: 95vw" class="tarjeta-dialogo">
-                <q-card-section>
-                    <div class="text-h6">{{ editando ? "Editar producto" : "Nuevo producto" }}</div>
-                </q-card-section>
+        <DialogoFormulario
+            v-model="dialogoAbierto"
+            :icono="editando ? 'edit' : 'add_box'"
+            :titulo="editando ? 'Editar producto' : 'Nuevo producto'"
+            subtitulo="Completa la informacion del producto para el catalogo"
+            ancho="560px"
+            :enviando="enviando"
+            @submit="guardar"
+        >
+            <div class="fila-dos-columnas">
+                <q-input
+                    v-model="form.sku"
+                    outlined
+                    label="SKU *"
+                    :rules="[requerido('El SKU')]"
+                    lazy-rules
+                />
+                <q-input
+                    v-model.number="form.stock"
+                    outlined
+                    type="number"
+                    label="Stock *"
+                    :rules="[requerido('El stock'), enteroNoNegativo()]"
+                    lazy-rules
+                />
+            </div>
 
-                <q-form @submit="guardar">
-                    <q-card-section class="q-gutter-md">
-                        <div class="row q-col-gutter-md">
-                            <q-input
-                                v-model="form.sku"
-                                outlined
-                                dense
-                                label="SKU *"
-                                class="col-6"
-                                :rules="[requerido('El SKU')]"
-                                lazy-rules
-                            />
-                            <q-input
-                                v-model.number="form.stock"
-                                outlined
-                                dense
-                                type="number"
-                                label="Stock *"
-                                class="col-6"
-                                :rules="[requerido('El stock'), enteroNoNegativo()]"
-                                lazy-rules
-                            />
-                        </div>
+            <q-input
+                v-model="form.nombre"
+                outlined
+                label="Nombre *"
+                :rules="[requerido('El nombre')]"
+                lazy-rules
+            />
 
-                        <q-input
-                            v-model="form.nombre"
-                            outlined
-                            dense
-                            label="Nombre *"
-                            :rules="[requerido('El nombre')]"
-                            lazy-rules
-                        />
+            <div class="fila-dos-columnas">
+                <q-input
+                    v-model.number="form.precio"
+                    outlined
+                    type="number"
+                    label="Precio (COP) *"
+                    :rules="[requerido('El precio'), numeroNoNegativo()]"
+                    lazy-rules
+                />
+                <q-select
+                    v-model="form.categoria"
+                    outlined
+                    emit-value
+                    map-options
+                    label="Categoria *"
+                    :options="opcionesCategoriaFormulario"
+                    :rules="[requerido('La categoria')]"
+                    lazy-rules
+                />
+            </div>
 
-                        <div class="row q-col-gutter-md">
-                            <q-input
-                                v-model.number="form.precio"
-                                outlined
-                                dense
-                                type="number"
-                                label="Precio (COP) *"
-                                class="col-6"
-                                :rules="[requerido('El precio'), numeroNoNegativo()]"
-                                lazy-rules
-                            />
-                            <q-select
-                                v-model="form.categoria"
-                                outlined
-                                dense
-                                emit-value
-                                map-options
-                                label="Categoria *"
-                                class="col-6"
-                                :options="opcionesCategoriaFormulario"
-                                :rules="[requerido('La categoria')]"
-                                lazy-rules
-                            />
-                        </div>
+            <q-select
+                v-model="form.proveedorId"
+                outlined
+                emit-value
+                map-options
+                label="Proveedor *"
+                hint="Solo se listan proveedores activos"
+                :options="opcionesProveedorFormulario"
+                :rules="[requerido('El proveedor')]"
+                lazy-rules
+            />
 
-                        <q-select
-                            v-model="form.proveedorId"
-                            outlined
-                            dense
-                            emit-value
-                            map-options
-                            label="Proveedor *"
-                            hint="Solo se listan proveedores activos"
-                            :options="opcionesProveedorFormulario"
-                            :rules="[requerido('El proveedor')]"
-                            lazy-rules
-                        />
+            <q-input
+                v-model="form.descripcion"
+                outlined
+                type="textarea"
+                autogrow
+                label="Descripcion"
+            />
 
-                        <q-input
-                            v-model="form.descripcion"
-                            outlined
-                            dense
-                            type="textarea"
-                            autogrow
-                            label="Descripcion"
-                        />
+            <q-input
+                v-model="form.imagenUrl"
+                outlined
+                label="URL de imagen"
+                :rules="[urlValida()]"
+                lazy-rules
+            />
 
-                        <q-input
-                            v-model="form.imagenUrl"
-                            outlined
-                            dense
-                            label="URL de imagen"
-                            :rules="[urlValida()]"
-                            lazy-rules
-                        />
-                    </q-card-section>
-
-                    <q-card-actions align="right" class="q-px-md q-pb-md">
-                        <q-btn flat no-caps label="Cancelar" @click="dialogoAbierto = false" />
-                        <q-btn unelevated no-caps color="primary" type="submit" label="Guardar" :loading="enviando" />
-                    </q-card-actions>
-                </q-form>
-            </q-card>
-        </q-dialog>
+            <div v-if="!editando" class="aviso-estado-inicial">
+                <q-icon name="info" size="16px" />
+                Los productos nuevos se crean como <strong>activos</strong>. Puedes cambiar el estado despues
+                desde el boton en la tabla.
+            </div>
+        </DialogoFormulario>
     </q-page>
 </template>
 
 <style scoped lang="scss">
+@import "@/styles/variables.scss";
+
 .tarjeta-dialogo {
     border-radius: 16px;
+}
+
+.fila-dos-columnas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
 }
 
 .miniatura-producto {
@@ -408,5 +430,16 @@ onMounted(async () => {
     -webkit-box-orient: vertical;
     overflow: hidden;
     font-size: 13px;
+}
+
+.aviso-estado-inicial {
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12.5px;
+    color: $texto-suave;
+    background: $fondo;
+    border-radius: 10px;
+    padding: 10px 12px;
+    line-height: 1.4;
 }
 </style>
