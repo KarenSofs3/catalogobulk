@@ -22,6 +22,10 @@ const categoriaSchema = new Schema({
         type: String,
         default: null,
         match: [/^https?:\/\/.+/, 'Imagen debe ser URL http(s)']
+    },
+    activo: {
+        type: Boolean,
+        default: true
     }
 }, {
     timestamps: true

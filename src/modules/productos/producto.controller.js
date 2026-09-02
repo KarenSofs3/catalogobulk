@@ -14,12 +14,13 @@ class ProductoController {
      */
     async obtenerProductos(req, res, next) {
         try {
-            const { page = 1, limit = 20, categoria, proveedor, disponible } = req.query;
+            const { page = 1, limit = 20, categoria, proveedor, disponible, activo } = req.query;
 
             const filtros = {};
             if (categoria) filtros.categoria = categoria;
             if (proveedor) filtros.proveedor = proveedor;
             if (disponible) filtros.disponible = disponible;
+            if (activo !== undefined) filtros.activo = activo;
 
             const resultado = await productoService.obtenerProductos(
                 filtros,

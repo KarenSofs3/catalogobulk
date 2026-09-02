@@ -40,6 +40,10 @@ class AuthService {
             throw new AppError('Credenciales inválidas', 401, 'CREDENCIALES_INVALIDAS');
         }
 
+        if (usuario.activo === false) {
+            throw new AppError('Esta cuenta está desactivada', 403, 'USUARIO_INACTIVO');
+        }
+
         const token = this.generarToken(usuario._id, usuario.rol);
         return { token };
     }

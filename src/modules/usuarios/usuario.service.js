@@ -50,7 +50,8 @@ class UsuarioService {
         return await usuarioRepository.create({
             email: emailNormalizado,
             password,
-            rol: rol === 'admin' ? 'admin' : 'user'
+            rol: rol === 'admin' ? 'admin' : 'user',
+            activo: true  // los usuarios nuevos siempre inician activos
         });
     }
 
@@ -58,13 +59,14 @@ class UsuarioService {
      * Actualizar usuario. La contraseña es opcional: si no se envía,
      * se conserva la actual.
      */
-    async actualizarUsuario(id, { email, password, rol }) {
+    async actualizarUsuario(id, { email, password, rol, activo }) {
         const usuario = await usuarioRepository.findById(id);
         if (!usuario) {
             throw new AppError('Usuario no encontrado', 404, 'USUARIO_NO_ENCONTRADO');
         }
 
         const updateData = {};
+        if (activo !== undefined) updateData.activo = activo;
 
         if (email && email.trim().toLowerCase() !== usuario.email) {
             const emailNormalizado = email.trim().toLowerCase();

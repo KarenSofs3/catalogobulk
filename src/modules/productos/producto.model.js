@@ -52,6 +52,10 @@ const productoSchema = new Schema({
         ref: 'Proveedor',
         required: [true, 'Proveedor es requerido']
     },
+    activo: {
+        type: Boolean,
+        default: true
+    },
     disponible: {
         type: Boolean,
         get: function() {

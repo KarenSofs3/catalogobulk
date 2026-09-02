@@ -15,7 +15,7 @@ class CategoriaService {
         return categoria;
     }
 
-    async actualizarCategoria(id, { nombre, descripcion, imagenUrl }) {
+    async actualizarCategoria(id, { nombre, descripcion, imagenUrl, activo }) {
         const categoria = await categoriaRepository.findById(id);
         if (!categoria) {
             throw new AppError('Categoría no encontrada', 404, 'CATEGORIA_NO_ENCONTRADA');
@@ -25,6 +25,7 @@ class CategoriaService {
         if (nombre) updateData.nombre = nombre.trim();
         if (descripcion !== undefined) updateData.descripcion = descripcion ? descripcion.trim() : null;
         if (imagenUrl !== undefined) updateData.imagenUrl = imagenUrl ? imagenUrl.trim() : null;
+        if (activo !== undefined) updateData.activo = activo;
 
         return await categoriaRepository.update(id, updateData);
     }
@@ -47,7 +48,8 @@ class CategoriaService {
             slug: slugNormalizado,
             nombre: nombre.trim(),
             descripcion: descripcion && descripcion.trim() ? descripcion.trim() : null,
-            imagenUrl: imagenUrl && imagenUrl.trim() ? imagenUrl.trim() : null
+            imagenUrl: imagenUrl && imagenUrl.trim() ? imagenUrl.trim() : null,
+            activo: true  // las categorias nuevas siempre inician activas
         });
     }
 

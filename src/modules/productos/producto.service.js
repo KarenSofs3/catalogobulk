@@ -37,6 +37,10 @@ class ProductoService {
                 : { $eq: 0 };
         }
 
+        if (filtros.activo !== undefined) {
+            queryFiltros.activo = filtros.activo === 'true' || filtros.activo === true;
+        }
+
         const skip = (page - 1) * limit;
         const [data, total] = await Promise.all([
             productoRepository.findAll(queryFiltros, skip, limit),
@@ -156,7 +160,8 @@ class ProductoService {
             categoria: categoria.trim().toLowerCase(),
             descripcion: descripcion && descripcion.trim() ? descripcion.trim() : null,
             imagenUrl: imagenUrl && imagenUrl.trim() ? imagenUrl.trim() : null,
-            proveedorId
+            proveedorId,
+            activo: true  // los productos nuevos siempre inician activos
         };
 
         return await productoRepository.create(productoData);
@@ -200,6 +205,7 @@ class ProductoService {
         if (datosActualizacion.descripcion !== undefined) updateData.descripcion = datosActualizacion.descripcion ? datosActualizacion.descripcion.trim() : null;
         if (datosActualizacion.imagenUrl !== undefined) updateData.imagenUrl = datosActualizacion.imagenUrl ? datosActualizacion.imagenUrl.trim() : null;
         if (datosActualizacion.proveedorId) updateData.proveedorId = datosActualizacion.proveedorId;
+        if (datosActualizacion.activo !== undefined) updateData.activo = datosActualizacion.activo;
 
         return await productoRepository.update(id, updateData);
     }

@@ -20,6 +20,10 @@ const usuarioSchema = new Schema({
         type: String,
         enum: ['admin', 'user'],
         default: 'user'
+    },
+    activo: {
+        type: Boolean,
+        default: true
     }
 }, {
     timestamps: true,
