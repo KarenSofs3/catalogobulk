@@ -4,7 +4,7 @@ import { env } from './env.js';
 
 // Configuramos el cliente con los datos de nuestro .env
 export const redisClient = createClient({
-    url: `redis://${env.REDIS_HOST}:${env.REDIS_PORT}`
+    url: `rediss://${env.REDIS_HOST}:${env.REDIS_PORT}`
 });
 
 // Manejador de errores global para Redis (Exigido para evitar caídas silenciosas)

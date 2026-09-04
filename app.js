@@ -19,7 +19,7 @@ const app = express();
 // Middleware global
 app.use(express.json());
 
-app.use(cors({ origin: 'http://localhost:5173' }));
+app.use(cors({ origin: "*" }));
 
 // Conectar bases de datos
 export const setupDatabases = async () => {
