@@ -15,7 +15,7 @@ class ProductoService {
      */
     async obtenerProductos(filtros = {}, page = 1, limit = 20) {
         // Validar limit no exceda el máximo
-        if (limit > 100) limit = 100;
+        if (limit > 100) limit = 200;
         if (page < 1) page = 1;
 
         // Construir query para MongoDB
