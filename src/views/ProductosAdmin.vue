@@ -36,10 +36,12 @@ const cargarDatosBase = async () => {
 const cargarProductos = async () => {
     cargando.value = true;
     try {
-        const params = new URLSearchParams({ limit: "100" });
+        const params = new URLSearchParams({ limit: "200" });
         if (filtroCategoria.value) params.set("categoria", filtroCategoria.value);
         if (filtroProveedor.value) params.set("proveedor", filtroProveedor.value);
         const respuesta = await get(`/productos?${params.toString()}`);
+        console.log(respuesta);
+        
         productos.value = respuesta.data;
     } catch (e) {
         notificarError(e.mensaje || "No se pudieron cargar los productos");
@@ -103,7 +105,7 @@ const columnas = [
     { name: "stock", label: "Stock", field: "stock", align: "center", sortable: true },
     { name: "descripcion", label: "Descripcion", field: "descripcion", align: "left" },
     { name: "estado", label: "Estado", field: "activo", align: "center" },
-    { name: "acciones", label: "Editar", field: "acciones", align: "center" },
+    { name: "opciones", label: "Opciones", field: "opciones", align: "center" },
 ];
 
 // ---- Dialog crear / editar ----
@@ -288,23 +290,30 @@ onMounted(async () => {
 
             <template #body-cell-estado="props">
                 <q-td :props="props" auto-width>
-                    <q-btn
-                        unelevated
-                        dense
-                        no-caps
-                        size="sm"
-                        class="boton-estado"
-                        :color="props.value ? 'positive' : 'negative'"
-                        :icon="props.value ? 'toggle_on' : 'toggle_off'"
-                        :label="props.value ? 'Activo' : 'Inactivo'"
-                        @click="cambiarEstado(props.row)"
-                    />
+                    <span class="texto-estado" :class="props.value ? 'texto-estado--activo' : 'texto-estado--inactivo'">
+                        {{ props.value ? "Activo" : "Inactivo" }}
+                    </span>
                 </q-td>
             </template>
 
-            <template #body-cell-acciones="props">
+            <template #body-cell-opciones="props">
                 <q-td :props="props" auto-width>
-                    <q-btn flat round dense icon="edit" size="sm" @click="abrirEditar(props.row)" />
+                    <div class="celda-opciones">
+                        <q-btn
+                            flat
+                            round
+                            dense
+                            size="md"
+                            :color="props.row.activo ? 'positive' : 'negative'"
+                            :icon="props.row.activo ? 'toggle_on' : 'toggle_off'"
+                            @click="cambiarEstado(props.row)"
+                        >
+                            <q-tooltip>{{ props.row.activo ? "Desactivar" : "Activar" }}</q-tooltip>
+                        </q-btn>
+                        <q-btn flat round dense size="md" icon="edit" @click="abrirEditar(props.row)">
+                            <q-tooltip>Editar</q-tooltip>
+                        </q-btn>
+                    </div>
                 </q-td>
             </template>
         </TablaDatos>
@@ -430,6 +439,26 @@ onMounted(async () => {
     -webkit-box-orient: vertical;
     overflow: hidden;
     font-size: 13px;
+}
+
+.texto-estado {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.texto-estado--activo {
+    color: #1e7e34;
+}
+
+.texto-estado--inactivo {
+    color: #b3261e;
+}
+
+.celda-opciones {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
 }
 
 .aviso-estado-inicial {

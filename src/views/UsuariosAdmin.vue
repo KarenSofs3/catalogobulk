@@ -71,7 +71,7 @@ const columnas = [
     { name: "usuario", label: "Usuario", field: "email", align: "left", sortable: true },
     { name: "rol", label: "Rol", field: "rol", align: "left" },
     { name: "estado", label: "Estado", field: "activo", align: "center" },
-    { name: "acciones", label: "Editar", field: "acciones", align: "center" },
+    { name: "opciones", label: "Opciones", field: "opciones", align: "center" },
 ];
 
 // ---- Dialog crear / editar ----
@@ -208,28 +208,34 @@ onMounted(cargarUsuarios);
 
             <template #body-cell-estado="props">
                 <q-td :props="props" auto-width>
-                    <q-btn
-                        unelevated
-                        dense
-                        no-caps
-                        size="sm"
-                        class="boton-estado"
-                        :color="props.value ? 'positive' : 'negative'"
-                        :icon="props.value ? 'toggle_on' : 'toggle_off'"
-                        :label="props.value ? 'Activo' : 'Inactivo'"
-                        :disable="props.row._id === auth.usuario?.id"
-                        @click="cambiarEstado(props.row)"
-                    >
-                        <q-tooltip v-if="props.row._id === auth.usuario?.id">
-                            No puedes desactivar tu propia cuenta
-                        </q-tooltip>
-                    </q-btn>
+                    <span class="texto-estado" :class="props.value ? 'texto-estado--activo' : 'texto-estado--inactivo'">
+                        {{ props.value ? "Activo" : "Inactivo" }}
+                    </span>
                 </q-td>
             </template>
 
-            <template #body-cell-acciones="props">
+            <template #body-cell-opciones="props">
                 <q-td :props="props" auto-width>
-                    <q-btn flat round dense icon="edit" size="sm" @click="abrirEditar(props.row)" />
+                    <div class="celda-opciones">
+                        <q-btn
+                            flat
+                            round
+                            dense
+                            size="md"
+                            :color="props.row.activo ? 'positive' : 'negative'"
+                            :icon="props.row.activo ? 'toggle_on' : 'toggle_off'"
+                            :disable="props.row._id === auth.usuario?.id"
+                            @click="cambiarEstado(props.row)"
+                        >
+                            <q-tooltip v-if="props.row._id === auth.usuario?.id">
+                                No puedes desactivar tu propia cuenta
+                            </q-tooltip>
+                            <q-tooltip v-else>{{ props.row.activo ? "Desactivar" : "Activar" }}</q-tooltip>
+                        </q-btn>
+                        <q-btn flat round dense size="md" icon="edit" @click="abrirEditar(props.row)">
+                            <q-tooltip>Editar</q-tooltip>
+                        </q-btn>
+                    </div>
                 </q-td>
             </template>
         </TablaDatos>
@@ -303,6 +309,26 @@ onMounted(cargarUsuarios);
 .avatar-usuario {
     font-size: 12px;
     font-weight: 600;
+}
+
+.texto-estado {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.texto-estado--activo {
+    color: #1e7e34;
+}
+
+.texto-estado--inactivo {
+    color: #b3261e;
+}
+
+.celda-opciones {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
 }
 
 .aviso-estado-inicial {

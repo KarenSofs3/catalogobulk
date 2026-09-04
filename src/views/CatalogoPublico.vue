@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, computed } from "vue";
+import { onMounted, onUnmounted, ref, computed } from "vue";
 import { get } from "@/services/api.services";
 
 const productos = ref([]);
@@ -10,7 +10,6 @@ const busqueda = ref("");
 const categoriasActivas = ref([]);
 const proveedoresActivos = ref([]);
 const orden = ref("nombre-asc");
-const vista = ref("grid");
 const expandido = ref(null);
 
 const cargarProductos = async () => {
@@ -65,6 +64,26 @@ const alternarDescripcion = (id) => {
 const formatoPrecio = (valor) =>
     new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(valor);
 
+// ─── Botón "subir arriba": aparece cuando bajas más de una pantalla
+// y, al hacer click, lleva al inicio de inmediato (sin animación).
+const mostrarBotonSubir = ref(false);
+
+const revisarScroll = () => {
+    mostrarBotonSubir.value = window.scrollY > window.innerHeight * 0.6;
+};
+
+const subirArriba = () => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+};
+
+onMounted(() => {
+    window.addEventListener("scroll", revisarScroll, { passive: true });
+});
+
+onUnmounted(() => {
+    window.removeEventListener("scroll", revisarScroll);
+});
+
 onMounted(cargarProductos);
 </script>
 
@@ -111,20 +130,20 @@ onMounted(cargarProductos);
                     />
                 </div>
 
+                <div class="bloque-filtro">
+                    <div class="titulo-filtro">Ordenar por</div>
+                    <q-radio v-model="orden" val="nombre-asc" label="Nombre A-Z" color="teal" dense class="opcion-filtro" />
+                    <q-radio v-model="orden" val="nombre-desc" label="Nombre Z-A" color="teal" dense class="opcion-filtro" />
+                    <q-radio v-model="orden" val="precio-asc" label="Precio: menor a mayor" color="teal" dense class="opcion-filtro" />
+                    <q-radio v-model="orden" val="precio-desc" label="Precio: mayor a menor" color="teal" dense class="opcion-filtro" />
+                </div>
+
                 <button v-if="categoriasActivas.length || proveedoresActivos.length || busqueda" class="boton-limpiar" @click="limpiarFiltros">
                     Quitar filtros
                 </button>
             </aside>
 
             <main class="principal">
-                <section class="banner-catalogo">
-                    <span class="banner-icono">◈</span>
-                    <div class="banner-titulo">Bienvenido a nuestro catálogo</div>
-                    <p class="banner-texto">
-                        Explora todos nuestros productos, filtra por categoría o proveedor y encuentra justo lo que necesitas.
-                    </p>
-                </section>
-
                 <div v-if="cargando" class="estado estado-carga">
                     <div class="spinner"></div>
                     <span>Cargando catálogo</span>
@@ -141,18 +160,6 @@ onMounted(cargarProductos);
                 <template v-else>
                     <div class="barra-controles">
                         <div class="contador">{{ productosFiltrados.length }} producto{{ productosFiltrados.length === 1 ? '' : 's' }}</div>
-                        <div class="controles-derecha">
-                            <div class="toggle-vista">
-                                <button :class="{ activo: vista === 'grid' }" @click="vista = 'grid'" title="Vista de cuadrícula">▦</button>
-                                <button :class="{ activo: vista === 'lista' }" @click="vista = 'lista'" title="Vista de lista">☰</button>
-                            </div>
-                            <select v-model="orden" class="selector-orden">
-                                <option value="nombre-asc">Nombre A-Z</option>
-                                <option value="nombre-desc">Nombre Z-A</option>
-                                <option value="precio-asc">Precio: menor a mayor</option>
-                                <option value="precio-desc">Precio: mayor a menor</option>
-                            </select>
-                        </div>
                     </div>
 
                     <div v-if="!productosFiltrados.length" class="estado estado-vacio">
@@ -160,22 +167,23 @@ onMounted(cargarProductos);
                         <div class="estado-detalle">Ajusta la búsqueda o quita algún filtro.</div>
                     </div>
 
-                    <div v-else class="grilla" :class="{ 'grilla-lista': vista === 'lista' }">
+                    <div v-else class="grilla">
                         <div v-for="producto in productosFiltrados" :key="producto._id" class="tarjeta">
                             <div class="tarjeta-imagen">
-                                <q-img v-if="producto.imagenUrl" :src="producto.imagenUrl" class="full-height" fit="contain" />
+                                <span class="badge-categoria">{{ capitalizar(nombreCategoria(producto)) }}</span>
+                                <q-img v-if="producto.imagenUrl" :src="producto.imagenUrl" class="full-height" fit="cover" />
                                 <div v-else class="marcador-textura"></div>
                             </div>
                             <div class="tarjeta-info">
-                                <div class="tarjeta-etiquetas">
-                                    <span class="etiqueta etiqueta-categoria">{{ capitalizar(nombreCategoria(producto)) }}</span>
-                                    <span class="etiqueta" :class="disponible(producto) ? 'etiqueta-disponible' : 'etiqueta-agotado'">
-                                        {{ disponible(producto) ? `Stock: ${producto.stock}` : 'Agotado' }}
-                                    </span>
+                                <div class="tarjeta-proveedor">
+                                    <span class="check-verificado">✓</span>
+                                    {{ nombreProveedor(producto) }}
                                 </div>
                                 <div class="tarjeta-nombre">{{ producto.nombre }}</div>
-                                <div class="tarjeta-proveedor">{{ nombreProveedor(producto) }}</div>
                                 <div class="tarjeta-precio">{{ formatoPrecio(producto.precio) }}</div>
+                                <span class="etiqueta" :class="disponible(producto) ? 'etiqueta-disponible' : 'etiqueta-agotado'">
+                                    {{ disponible(producto) ? `Stock disponible: ${producto.stock}` : 'Agotado' }}
+                                </span>
                                 <button v-if="producto.descripcion" class="boton-ver-mas" @click="alternarDescripcion(producto._id)">
                                     {{ expandido === producto._id ? 'Ver menos' : 'Ver más' }}
                                 </button>
@@ -186,6 +194,12 @@ onMounted(cargarProductos);
                 </template>
             </main>
         </div>
+
+        <Transition name="fade-subir">
+            <button v-if="mostrarBotonSubir" class="boton-subir" @click="subirArriba" aria-label="Subir al inicio" title="Subir al inicio">
+                ↑
+            </button>
+        </Transition>
     </div>
 </template>
 
@@ -221,13 +235,13 @@ onMounted(cargarProductos);
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 16px 32px;
+    padding: 16px 40px;
     background: var(--marca-oscura);
 }
 
 .marca {
     position: absolute;
-    left: 32px;
+    left: 40px;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -278,65 +292,21 @@ onMounted(cargarProductos);
     }
 }
 
-// ─── Banner tipo "hero" (inspirado en el banner de bienvenida de Docker Hub),
-// con los colores propios del catalogo en vez de los de Docker.
-// Vive dentro de .principal, asi que su ancho es el mismo que el de la grilla de productos.
-.banner-catalogo {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 8px;
-    padding: 40px 32px;
-    background: var(--marca-oscura);
-    border-radius: 16px;
-    margin-bottom: 24px;
-}
-
-.banner-icono {
-    font-size: 24px;
-    color: var(--acento);
-    margin-bottom: 4px;
-}
-
-.banner-titulo {
-    font-family: "Space Grotesk", sans-serif;
-    font-weight: 700;
-    font-size: 26px;
-    color: #ffffff;
-    line-height: 1.2;
-}
-
-.banner-texto {
-    max-width: 460px;
-    font-size: 13.5px;
-    color: rgba(255, 255, 255, 0.65);
-    line-height: 1.5;
-    margin: 0;
-}
-
+// ─── Layout principal: sin max-width ni centrado, para eliminar los
+// espacios muertos a los lados y que los filtros + la grilla usen
+// todo el ancho disponible (igual que la vista de resultados de ML).
 .cuerpo {
     display: flex;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 24px 32px 56px;
-    gap: 32px;
+    width: 100%;
+    padding: 24px 40px 56px;
+    gap: 28px;
     align-items: flex-start;
 }
 
 .filtros {
-    width: 230px;
+    width: 240px;
     flex-shrink: 0;
-    background: var(--bg-surface);
-    border: 1px solid var(--borde);
-    border-radius: 14px;
-    padding: 20px;
-    box-shadow: 0 4px 12px rgba(16, 24, 38, 0.04);
 
-    // Hace que el panel "acompañe" el scroll de la página en vez de
-    // quedarse anclado arriba: se pega justo debajo del header (que
-    // también es sticky) y se mueve junto con el contenido hasta que
-    // .cuerpo (su contenedor) se termina.
     position: sticky;
     top: calc(var(--alto-header) + 24px);
     align-self: flex-start;
@@ -347,23 +317,21 @@ onMounted(cargarProductos);
 .bloque-filtro {
     display: flex;
     flex-direction: column;
-    margin-bottom: 22px;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--borde);
 
     &:last-of-type {
-        margin-bottom: 12px;
+        border-bottom: none;
     }
 }
 
 .titulo-filtro {
     font-family: "Space Grotesk", sans-serif;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
     color: var(--filtro-titulo);
-    margin-bottom: 8px;
-    padding-bottom: 6px;
-    border-bottom: 2px solid var(--acento-suave);
+    margin-bottom: 10px;
 }
 
 .opcion-filtro {
@@ -388,63 +356,18 @@ onMounted(cargarProductos);
 .principal {
     flex: 1;
     min-width: 0;
-    scroll-margin-top: 24px;
 }
 
 .barra-controles {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     margin-bottom: 16px;
-    gap: 12px;
 }
 
 .contador {
     font-size: 13px;
     color: var(--texto-tenue);
     white-space: nowrap;
-}
-
-.controles-derecha {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.toggle-vista {
-    display: flex;
-    border: 1px solid var(--borde);
-    border-radius: 8px;
-    overflow: hidden;
-
-    button {
-        background: var(--bg-surface);
-        border: none;
-        color: var(--texto-tenue);
-        padding: 6px 10px;
-        cursor: pointer;
-        font-size: 13px;
-        line-height: 1;
-
-        &.activo {
-            background: var(--acento-suave);
-            color: var(--acento);
-        }
-    }
-}
-
-.selector-orden {
-    background: var(--bg-surface);
-    border: 1px solid var(--borde);
-    border-radius: 8px;
-    color: var(--texto-principal);
-    font-size: 12.5px;
-    padding: 7px 10px;
-    outline: none;
-
-    &:focus {
-        border-color: var(--acento);
-    }
 }
 
 .estado {
@@ -503,52 +426,45 @@ onMounted(cargarProductos);
     }
 }
 
+// Más columnas, más angostas y con menos separación: al ganar ancho
+// (sin los márgenes laterales) entran más productos por fila, como
+// en la grilla de resultados de Mercado Libre.
 .grilla {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 22px;
-}
-
-.grilla-lista {
-    grid-template-columns: 1fr;
-
-    .tarjeta {
-        display: flex;
-        flex-direction: row;
-        align-items: stretch;
-        height: 200px; // alto fijo para todas las cards horizontales
-    }
-
-    .tarjeta-imagen {
-        width: 220px;
-        height: 100%; // ya no depende del contenido, toma el alto fijo del padre
-        flex-shrink: 0;
-    }
-
-    .tarjeta-info {
-        flex: 1;
-        height: 100%;
-        overflow-y: auto; // si la descripción se expande, hace scroll en vez de estirar la card
-    }
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 16px;
 }
 
 .tarjeta {
     background: var(--bg-surface);
     border: 1px solid var(--borde);
-    border-radius: 16px;
+    border-radius: 10px;
     overflow: hidden;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: box-shadow 0.15s ease;
 
     &:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 20px rgba(16, 24, 38, 0.08);
+        box-shadow: 0 6px 16px rgba(16, 24, 38, 0.08);
     }
 }
 
 .tarjeta-imagen {
     position: relative;
-    height: 240px;
+    width: 100%;
+    aspect-ratio: 1 / 1;
     background: var(--bg-surface-2);
+
+    // La imagen (o el placeholder) llena por completo el contenedor,
+    // recortando en vez de dejar espacio vacío alrededor.
+    :deep(img) {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+}
+
+.full-height {
+    width: 100%;
+    height: 100%;
 }
 
 .marcador-textura {
@@ -557,29 +473,75 @@ onMounted(cargarProductos);
     background: repeating-linear-gradient(135deg, var(--bg-surface-2) 0 8px, #e3e8f0 8px 16px);
 }
 
-.tarjeta-info {
-    padding: 16px 18px 18px;
-}
-
-.tarjeta-etiquetas {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 8px;
-}
-
-.etiqueta {
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    padding: 3px 8px;
+.badge-categoria {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 1;
+    background: var(--marca-oscura);
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 4px 8px;
     border-radius: 999px;
 }
 
-.etiqueta-categoria {
-    background: var(--bg-surface-2);
-    color: var(--texto-muted);
-    text-transform: uppercase;
+.tarjeta-info {
+    padding: 12px 14px 14px;
+}
+
+.tarjeta-proveedor {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--texto-tenue);
+    margin-bottom: 4px;
+}
+
+.check-verificado {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: var(--acento);
+    color: #ffffff;
+    font-size: 8.5px;
+    line-height: 1;
+}
+
+.tarjeta-nombre {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--texto-principal);
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 2.6em;
+}
+
+.tarjeta-precio {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--texto-principal);
+    margin-top: 6px;
+}
+
+.etiqueta {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    padding: 3px 8px;
+    border-radius: 999px;
+    margin-top: 8px;
 }
 
 .etiqueta-disponible {
@@ -592,27 +554,8 @@ onMounted(cargarProductos);
     color: var(--calido);
 }
 
-.tarjeta-nombre {
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--texto-principal);
-}
-
-.tarjeta-proveedor {
-    font-size: 12.5px;
-    color: var(--texto-tenue);
-    margin-top: 2px;
-}
-
-.tarjeta-precio {
-    font-family: "Space Grotesk", sans-serif;
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--acento);
-    margin-top: 10px;
-}
-
 .boton-ver-mas {
+    display: block;
     background: none;
     border: none;
     color: var(--texto-muted);
@@ -649,14 +592,6 @@ onMounted(cargarProductos);
         max-width: none;
     }
 
-    .banner-catalogo {
-        padding: 40px 24px;
-    }
-
-    .banner-titulo {
-        font-size: 24px;
-    }
-
     .cuerpo {
         flex-direction: column;
         padding: 20px;
@@ -667,5 +602,39 @@ onMounted(cargarProductos);
         position: static; // en móvil, apilado arriba, no tiene sentido el sticky
         max-height: none;
     }
+}
+
+.boton-subir {
+    position: fixed;
+    right: 28px;
+    bottom: 28px;
+    z-index: 20;
+    width: 48px;
+    height: 48px;
+    border: none;
+    border-radius: 50%;
+    background: var(--marca-oscura);
+    color: var(--acento);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(16, 24, 38, 0.28);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+    &:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 22px rgba(16, 24, 38, 0.32);
+    }
+}
+
+.fade-subir-enter-active,
+.fade-subir-leave-active {
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.fade-subir-enter-from,
+.fade-subir-leave-to {
+    opacity: 0;
+    transform: translateY(8px);
 }
 </style>
