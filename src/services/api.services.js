@@ -7,6 +7,7 @@ export const get = async (url) => {
 
 export const post = async (url, datos) => {
     const { data } = await api.post(url, datos);
+  
     return data;
 };
 
