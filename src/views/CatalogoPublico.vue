@@ -206,6 +206,7 @@ onMounted(cargarProductos);
     --calido: #e0552f;
     --calido-suave: #fdece6;
     --filtro-titulo: #101c2e;
+    --alto-header: 73px; // alto real del .encabezado (16px+16px padding + ~41px de contenido), usado para que .filtros no quede tapado por el header sticky
 
     min-height: 100vh;
     background: var(--bg-base);
@@ -214,7 +215,9 @@ onMounted(cargarProductos);
 }
 
 .encabezado {
-    position: relative;
+    position: sticky;
+    top: 0;
+    z-index: 10;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -329,6 +332,16 @@ onMounted(cargarProductos);
     border-radius: 14px;
     padding: 20px;
     box-shadow: 0 4px 12px rgba(16, 24, 38, 0.04);
+
+    // Hace que el panel "acompañe" el scroll de la página en vez de
+    // quedarse anclado arriba: se pega justo debajo del header (que
+    // también es sticky) y se mueve junto con el contenido hasta que
+    // .cuerpo (su contenedor) se termina.
+    position: sticky;
+    top: calc(var(--alto-header) + 24px);
+    align-self: flex-start;
+    max-height: calc(100vh - var(--alto-header) - 48px);
+    overflow-y: auto;
 }
 
 .bloque-filtro {
@@ -651,6 +664,8 @@ onMounted(cargarProductos);
 
     .filtros {
         width: 100%;
+        position: static; // en móvil, apilado arriba, no tiene sentido el sticky
+        max-height: none;
     }
 }
 </style>
