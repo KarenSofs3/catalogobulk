@@ -3,6 +3,8 @@ import { productoRepository } from './producto.repository.js';
 import { proveedorRepository } from '../proveedores/proveedor.repository.js';
 import { AppError } from '../../errors/AppError.js';
 import { Producto } from './producto.model.js';
+import { Categoria } from '../categorias/categoria.model.js'; 
+import { Proveedor } from '../proveedores/proveedor.model.js';
 
 /**
  * Service: lógica de negocio de productos.
@@ -219,6 +221,60 @@ class ProductoService {
             throw new AppError('Producto no encontrado', 404, 'PRODUCTO_NO_ENCONTRADO');
         }
         await productoRepository.delete(id);
+    }
+     /**
+     * Poblar productos de demostración (solo para pruebas/seed rápido).
+     */
+    async poblarDemo(cantidad = 100) {
+        if (typeof cantidad !== 'number' || cantidad < 1 || cantidad > 1000) {
+            throw new AppError('cantidad debe ser un número entre 1 y 1000', 400, 'CANTIDAD_INVALIDA');
+        }
+
+        const categorias = await Categoria.find({}).lean();
+        const proveedores = await Proveedor.find({ activo: true }).lean();
+
+        if (categorias.length === 0 || proveedores.length === 0) {
+            throw new AppError(
+                'No hay categorías o proveedores activos. Crea al menos 1 de cada uno primero.',
+                409,
+                'DATOS_BASE_FALTANTES'
+            );
+        }
+
+        const NOMBRES_POR_CATEGORIA = {
+            ropa: ['Camiseta', 'Chaqueta', 'Pantalon', 'Sudadera', 'Camisa', 'Vestido', 'Short', 'Buzo'],
+            calzado: ['Tenis urbanos', 'Botas', 'Sandalias', 'Zapato casual', 'Zapatillas deportivas'],
+            accesorios: ['Cinturon', 'Gorra', 'Bufanda', 'Bolso', 'Billetera', 'Reloj', 'Gafas']
+        };
+        const ADJETIVOS = ['clasico', 'premium', 'urbano', 'deportivo', 'basico', 'edicion limitada', 'casual', 'de temporada'];
+        const numeroAleatorio = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+        const elegir = (arr) => arr[numeroAleatorio(0, arr.length - 1)];
+        const generarNombre = (slug) => {
+            const base = NOMBRES_POR_CATEGORIA[slug] || [`Producto ${slug}`];
+            return `${elegir(base)} ${elegir(ADJETIVOS)}`;
+        };
+
+        const sufijoUnico = Date.now().toString().slice(-6);
+        const productos = [];
+
+        for (let i = 1; i <= cantidad; i++) {
+            const categoria = elegir(categorias);
+            const proveedor = elegir(proveedores);
+            productos.push({
+                sku: `GEN-${sufijoUnico}-${String(i).padStart(3, '0')}`,
+                nombre: generarNombre(categoria.slug),
+                precio: numeroAleatorio(15, 800) * 1000,
+                stock: numeroAleatorio(0, 60),
+                categoria: categoria.slug,
+                descripcion: null,
+                imagenUrl: `https://picsum.photos/seed/${sufijoUnico}-${i}/640/480`,
+                proveedorId: proveedor._id,
+                activo: Math.random() < 0.9
+            });
+        }
+
+        const insertados = await Producto.insertMany(productos);
+        return { insertados: insertados.length };
     }
 }
 

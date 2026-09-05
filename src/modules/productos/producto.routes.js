@@ -30,4 +30,6 @@ router.put('/:id', rol('admin'), productoController.actualizarProducto.bind(prod
 // DELETE /api/productos/:id — eliminar, solo admin
 router.delete('/:id', rol('admin'), productoController.eliminarProducto.bind(productoController));
 
+router.post('/poblar-demo', rol('admin'), productoController.poblarDemo.bind(productoController))
+
 export default router;

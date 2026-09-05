@@ -103,6 +103,15 @@ class ProductoController {
             next(error);
         }
     }
+    async poblarDemo(req, res, next) {
+        try {
+            const cantidad = req.body.cantidad ? parseInt(req.body.cantidad) : 100;
+            const resultado = await productoService.poblarDemo(cantidad);
+            res.status(201).json(resultado);
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 export const productoController = new ProductoController();
