@@ -19,7 +19,7 @@ const app = express();
 // Middleware global
 app.use(express.json());
 
-app.use(cors({ origin: "*" }));
+app.use(cors({ origin: "https://catalogobulk.vercel.app/" }));
 
 // Conectar bases de datos
 export const setupDatabases = async () => {
